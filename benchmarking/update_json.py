@@ -4,10 +4,10 @@ from typing import Dict, List, Tuple
 
 from dotenv import load_dotenv
 from benchmarking.connect import connect_to_db
+from benchmarking.table_config import TRAJECTORY_CS_TABLE
 
 JSON_PATH = Path("benchmarking/benchmark_results/run_20251209_095304.json")
-ZOOMS = ("z13", "z17", "z21")
-TABLE = "prototype2.trajectory_supercover_cs"
+TABLE = TRAJECTORY_CS_TABLE
 
 
 def _collect_samples(node: Dict) -> List[int]:
@@ -31,8 +31,7 @@ def load_ids() -> Tuple[Dict, List[int]]:
     for bench in data.get("benchmarks", []):
         result = bench.get("result", {})
         ids.update(_collect_samples(result.get("st")))
-        for cst in result.get("cst_results", {}).values():
-            ids.update(_collect_samples(cst))
+        ids.update(_collect_samples(result.get("cst")))
         for area_runs in result.get("per_area_results", {}).values():
             if not isinstance(area_runs, dict):
                 continue
@@ -46,26 +45,27 @@ def load_ids() -> Tuple[Dict, List[int]]:
     return data, sorted(ids)
 
 
-def fetch_supercover(conn, zoom: str, ids: List[int]) -> Dict[int, int]:
+def fetch_trajectory_cardinality(conn, ids: List[int]) -> Dict[int, int]:
     if not ids:
         return {}
-    with conn.cursor() as cur:
-        cur.execute(
-            f"""
-            SELECT trajectory_id, Cardinality(cellstring_{zoom})
-            FROM {TABLE}
-            WHERE trajectory_id = ANY(%s)
-            """,
-            (ids,),
-        )
-        return {int(traj_id): int(count) for traj_id, count in cur.fetchall() if count is not None}
+    placeholders = ", ".join(["?"] * len(ids))
+    rows = conn.execute(
+        f"""
+        SELECT trajectory_id, COUNT(*)
+        FROM {TABLE}
+        WHERE trajectory_id IN ({placeholders})
+        GROUP BY trajectory_id
+        """,
+        ids,
+    ).fetchall()
+    return {int(traj_id): int(count) for traj_id, count in rows if count is not None}
 
 
-def embed(data: Dict, lookup_per_zoom: Dict[str, Dict[int, int]]) -> None:
+def embed(data: Dict, cardinalities: Dict[int, int]) -> None:
     meta = data.setdefault("meta", {})
-    dest = meta.setdefault("trajectory_supercover_cardinalities", {})
-    for zoom, values in lookup_per_zoom.items():
-        dest[zoom] = {str(traj_id): count for traj_id, count in sorted(values.items())}
+    meta["trajectory_cardinalities"] = {
+        str(traj_id): count for traj_id, count in sorted(cardinalities.items())
+    }
 
 
 if __name__ == "__main__":
@@ -75,9 +75,9 @@ if __name__ == "__main__":
         raise SystemExit("No trajectory IDs found in the report.")
     conn = connect_to_db()
     try:
-        per_zoom = {zoom: fetch_supercover(conn, zoom, ids) for zoom in ZOOMS}
+        cardinalities = fetch_trajectory_cardinality(conn, ids)
     finally:
         conn.close()
-    embed(data, per_zoom)
+    embed(data, cardinalities)
     JSON_PATH.write_text(json.dumps(data, indent=2))
-    print(f"Updated {JSON_PATH} with supercover cardinalities for {len(ids)} trajectories.")
+    print(f"Updated {JSON_PATH} with trajectory cardinalities for {len(ids)} trajectories.")

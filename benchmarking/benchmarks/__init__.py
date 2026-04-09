@@ -1,12 +1,5 @@
-from .intersects_area_benchmark import BENCHMARK as intersects_area_benchmark
-from .intersects_traj_benchmark_bresenham import BENCHMARK as intersects_traj_benchmark_bresenham
-from .intersects_traj_benchmark_supercover import BENCHMARK as intersects_traj_benchmark_supercover
-from .hausdorff_distance_benchmark import BENCHMARK as hausdorff_distance_benchmark
-from .intersects_with_stop_spatially_and_temporally import BENCHMARK as intersects_with_stop_spatially_and_temporally_benchmark
-from .via_query_benchmark import CROSSING_VIA_BENCHMARKS
-from .linestring_containment_benchmark import LINESTRING_CONTAINMENT_BENCHMARKS
-from .area_mmsi_coverage_benchmark import AREA_MMSI_COVERAGE_BENCHMARKS
+from benchmarking.benchmarks.temporal_range_benchmark import TEMPORAL_RANGE_BENCHMARKS
 
 RUN_PLAN = [
-    *CROSSING_VIA_BENCHMARKS
+    *TEMPORAL_RANGE_BENCHMARKS,
 ]

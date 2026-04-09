@@ -1,372 +1,295 @@
+from __future__ import annotations
+
 import json
 import os
 import re
-import sys
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from statistics import median
-from typing import Dict, List
+from typing import Any, Dict, List
+
 from dotenv import load_dotenv
-from benchmarking.connect import connect_to_db
+
+from benchmarking.connect import DuckDBConfig, connect_to_db
 from benchmarking.core import (
     RunOutcome,
     TimeBenchmark,
     TimeBenchmarkResult,
     ValueBenchmark,
     ValueBenchmarkResult,
-    run_time_benchmark,
     print_time_result,
+    print_value_result,
+    run_time_benchmark,
     run_value_benchmark,
-    print_value_result
 )
-from benchmarking.benchmarks import RUN_PLAN
 
-
-ZOOM_LEVELS = ["z13", "z17", "z21"]
 TABLE_PATTERN = re.compile(r"\b(?:FROM|JOIN)\s+([A-Za-z0-9_.]+)", re.IGNORECASE)
+IDENT_PATTERN = re.compile(r"[A-Za-z0-9_.]+")
 
 
-def _get_area_ids(conn, selected_ids=None):
-    with conn.cursor() as cur:
-        cur.execute("SELECT DISTINCT area_id FROM benchmark.area_poly ORDER BY area_id")
-        all_area_ids = [row[0] for row in cur.fetchall()]
-
-        if selected_ids:
-            return [aid for aid in selected_ids if aid in all_area_ids]
-        return all_area_ids
+def _default_trajectory_id_source_table() -> str:
+    cellstring_schema = os.getenv("CELLSTRING_SCHEMA", "db_design1_v3")
+    return os.getenv("TRAJECTORY_ID_SOURCE_TABLE", f"{cellstring_schema}.trajectory_cs")
 
 
-def _fetch_random_ids(cur, column_name, table_name, sample_size):
-    if sample_size <= 0:
-        return []
-    if not re.fullmatch(r"[A-Za-z0-9_]+", column_name):
-        raise ValueError(f"Invalid column name: {column_name}")
-    if not re.fullmatch(r"[A-Za-z0-9_.]+", table_name):
-        raise ValueError(f"Invalid table name: {table_name}")
-    cur.execute(
-        f"SELECT {column_name} FROM {table_name} ORDER BY random() LIMIT %s",
-        (sample_size,)
-    )
-    return [row[0] for row in cur.fetchall()]
+def _default_stop_id_source_table() -> str:
+    cellstring_schema = os.getenv("CELLSTRING_SCHEMA", "db_design1_v3")
+    return os.getenv("STOP_ID_SOURCE_TABLE", f"{cellstring_schema}.stop_cs")
 
 
-def _build_length_stats(stat_entries):
-    stats = []
-    for label, lengths in stat_entries:
-        if not lengths:
+def _default_area_id_source_table() -> str:
+    cellstring_schema = os.getenv("CELLSTRING_SCHEMA", "db_design1_v3")
+    return os.getenv("AREA_ID_SOURCE_TABLE", f"{cellstring_schema}.area_cs")
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"Invalid integer in {name}: {raw}") from exc
+
+
+def _thread_plan() -> List[int]:
+    scaling = os.getenv("DUCKDB_THREAD_SCALING", "").strip()
+    base_threads = max(1, _env_int("DUCKDB_THREADS", 1))
+    if not scaling:
+        return [base_threads]
+    counts: List[int] = []
+    for item in scaling.split(","):
+        value = item.strip()
+        if not value:
             continue
-        stats.append(
-            {
-                "label": label,
-                "min": min(lengths),
-                "median": median(lengths),
-                "max": max(lengths),
-                "count": len(lengths),
+        counts.append(max(1, int(value)))
+    return counts or [base_threads]
+
+
+def _benchmark_filters() -> List[str]:
+    csv = os.getenv("BENCHMARKS", "").strip()
+    if not csv:
+        return []
+    return [name.strip() for name in csv.split(",") if name.strip()]
+
+
+def _cache_state() -> str:
+    state = os.getenv("CACHE_STATE", "warm").strip().lower()
+    return state if state in {"warm", "cold"} else "warm"
+
+
+def _serialize_run_outcome(run: RunOutcome) -> Dict[str, Any]:
+    if run.samples:
+        return {
+            "exec_ms_med": run.exec_ms_med,
+            "samples": run.samples,
+        }
+    return {"exec_ms_med": run.exec_ms_med}
+
+
+def _serialize_time_result(result: TimeBenchmarkResult) -> Dict[str, Any]:
+    return {
+        "st": _serialize_run_outcome(result.st),
+        "cst": _serialize_run_outcome(result.cst),
+        "false_positives": result.false_positives,
+        "false_negatives": result.false_negatives,
+        "per_area_results": {
+            str(area_id): {
+                label: _serialize_run_outcome(run) for label, run in runs.items()
             }
-        )
-    return stats
+            for area_id, runs in result.per_area_results.items()
+        },
+        "result_counts": result.result_counts,
+    }
 
 
-def _print_trajectory_stats(stat_entries, sample_size):
-    if not stat_entries:
-        print("\nNo trajectory statistics available.")
-        return []
-    stats = _build_length_stats(stat_entries)
-    print(f"\n{sample_size} trajectory statistics:")
-    for entry in stats:
-        print(
-            f"{entry['label']}: Min length: {entry['min']}, "
-            f"Median length: {entry['median']}, "
-            f"Max length: {entry['max']}"
-        )
-    return stats
+def _serialize_value_result(result: ValueBenchmarkResult) -> Dict[str, Any]:
+    if result.rows:
+        return {
+            "median_values": result.median_values,
+            "rows": result.rows,
+        }
+    return {"median_values": result.median_values}
 
 
-def _print_stop_stats(stat_entries, sample_size):
-    if not stat_entries:
-        print("\nNo stop statistics available.")
-        return []
-    stats = _build_length_stats(stat_entries)
-    print(f"\n{sample_size} stop statistics:")
-    for entry in stats:
-        print(
-            f"{entry['label']}: Min size: {entry['min']}, "
-            f"Median size: {entry['median']}, "
-            f"Max size: {entry['max']}"
-        )
-    return stats
-
-
-def _collect_tables(*sql_statements):
+def _collect_tables(*sql_statements: str) -> List[str]:
     tables = set()
     for sql in sql_statements:
-        if not sql:
-            continue
-        tables.update(TABLE_PATTERN.findall(sql))
+        if sql:
+            tables.update(TABLE_PATTERN.findall(sql))
     return sorted(tables)
 
 
-def _collect_tables_from_benchmark(benchmark):
+def _collect_tables_from_benchmark(benchmark: object) -> List[str]:
     if isinstance(benchmark, TimeBenchmark):
         return _collect_tables(benchmark.st_sql, benchmark.cst_sql)
     if isinstance(benchmark, ValueBenchmark):
         return _collect_tables(benchmark.sql)
-    if hasattr(benchmark, 'sql'):
-        return _collect_tables(benchmark.sql)
     return []
-
-
-def _serialize_run_outcome(run: RunOutcome) -> dict:
-    payload = {
-        "exec_ms_med": run.exec_ms_med,
-        "wall_ms_med": run.wall_ms_med,
-        "timed_out": run.timed_out,
-    }
-    if run.samples:
-        payload["samples"] = run.samples
-    return payload
-
-
-def _serialize_time_result(result: TimeBenchmarkResult) -> dict:
-    return {
-        "st": _serialize_run_outcome(result.st),
-        "cst_results": {zoom: _serialize_run_outcome(outcome) for zoom, outcome in result.cst_results.items()},
-        "false_positives": result.false_positives,
-        "false_negatives": result.false_negatives,
-        "per_area_results": {
-            str(area_id): {label: _serialize_run_outcome(run) for label, run in runs.items()}
-            for area_id, runs in result.per_area_results.items()
-        },
-        "match_counts": result.match_counts,
-    }
-
-
-def _serialize_value_result(result: ValueBenchmarkResult) -> dict:
-    payload = {"median_values": result.median_values}
-    if result.rows_by_zoom:
-        payload["rows_by_zoom"] = result.rows_by_zoom
-    return payload
 
 
 def _write_json_report(payload: dict, run_started_at: datetime) -> Path:
     output_dir = Path("benchmarking/benchmark_results")
     output_dir.mkdir(parents=True, exist_ok=True)
-    file_name = f"run_{run_started_at.strftime('%Y%m%d_%H%M%S')}.json"
-    output_path = output_dir / file_name
-    with output_path.open("w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2, default=str)
-    print(f"\nSaved run report to {output_path}")
-    return output_path
+    path = output_dir / f"run_{run_started_at.strftime('%Y%m%d_%H%M%S')}.json"
+    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    print(f"\nSaved run report to {path}")
+    return path
 
 
-def main():
+def _fetch_random_ids(
+    conn, table_name: str, id_column: str, sample_size: int
+) -> List[int]:
+    if sample_size <= 0:
+        return []
+    if not IDENT_PATTERN.fullmatch(table_name) or not IDENT_PATTERN.fullmatch(
+        id_column
+    ):
+        raise ValueError(
+            f"Unsafe identifier(s): table={table_name}, column={id_column}"
+        )
+    rows = conn.execute(
+        f"SELECT {id_column} FROM {table_name} ORDER BY random() LIMIT ?",
+        [sample_size],
+    ).fetchall()
+    return [int(row[0]) for row in rows]
+
+
+def _get_area_ids(conn, area_table: str) -> List[int]:
+    try:
+        rows = conn.execute(
+            f"SELECT DISTINCT area_id FROM {area_table} ORDER BY area_id"
+        ).fetchall()
+    except Exception:
+        return []
+    return [int(row[0]) for row in rows]
+
+
+def main() -> None:
     load_dotenv()
-    trajectory_source_table = "prototype2.trajectory_cs"
-    stop_source_table = "prototype2.stop_cs"
-    trajectory_sample_size = 400
-    stop_sample_size = 400
-    min_trajectory_length_m = 500
-
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        sys.exit("DATABASE_URL not defined in .env file")
+    cellstring_schema = os.getenv("CELLSTRING_SCHEMA", "db_design1_v3")
+    from benchmarking.benchmarks import RUN_PLAN
 
     run_started_at = datetime.now(timezone.utc)
 
+    duckdb_path = os.getenv("DUCKDB_PATH", "cellstring.duckdb")
+    threads = max(1, _env_int("DUCKDB_THREADS", 1))
+    trajectory_id_source_table = _default_trajectory_id_source_table()
+    trajectory_id_column = os.getenv("TRAJECTORY_ID_COLUMN", "trajectory_id")
+    trajectory_sample_size = _env_int("TRAJECTORY_SAMPLE_SIZE", 400)
+    stop_id_source_table = _default_stop_id_source_table()
+    stop_id_column = os.getenv("STOP_ID_COLUMN", "stop_id")
+    stop_sample_size = _env_int("STOP_SAMPLE_SIZE", 400)
+    area_id_source_table = _default_area_id_source_table()
+    run_label = os.getenv("RUN_LABEL", "local")
+    cache_state = _cache_state()
+    thread_counts = _thread_plan()
+
     if not RUN_PLAN:
-        print("No benchmarks defined in RUN_PLAN. Exiting.")
+        print(
+            "RUN_PLAN is empty. Add benchmark definitions in benchmarking/benchmarks and rerun."
+        )
         return
-    conn = connect_to_db()
+
+    benchmark_filters = set(_benchmark_filters())
+    if benchmark_filters:
+        run_plan = [bench for bench in RUN_PLAN if bench.name in benchmark_filters]
+        if not run_plan:
+            print("No benchmarks matched BENCHMARKS in .env.")
+            print("Available benchmarks:")
+            for bench in RUN_PLAN:
+                print(f"- {bench.name}")
+            return
+    else:
+        run_plan = RUN_PLAN
+
+    conn = connect_to_db(DuckDBConfig(db_path=duckdb_path, threads=threads))
     try:
-        trajectory_ids = []
-        stop_ids = []
+        trajectory_ids = _fetch_random_ids(
+            conn,
+            trajectory_id_source_table,
+            trajectory_id_column,
+            trajectory_sample_size,
+        )
+        stop_ids = _fetch_random_ids(
+            conn, stop_id_source_table, stop_id_column, stop_sample_size
+        )
+        benchmark_outputs: List[Dict[str, object]] = []
 
-        traj_linestring_lengths: List[float] = []
-        linestring_lengths_by_id: Dict[int, float] = {}
-        linestring_mbr_areas_by_id: Dict[int, float] = {}
-        traj_cellstring_lengths: Dict[str, List[int]] = {zoom: [] for zoom in ZOOM_LEVELS}
-        cellstring_lengths: Dict[str, Dict[int, int]] = {zoom: {} for zoom in ZOOM_LEVELS}
-        stop_poly_area_size: List[float] = []
-        stop_polygon_areas_by_id: Dict[int, float] = {}
-        stop_cellstring_lengths: Dict[str, List[int]] = {zoom: [] for zoom in ZOOM_LEVELS}
-        stop_cellstring_cardinalities: Dict[str, Dict[int, int]] = {zoom: {} for zoom in ZOOM_LEVELS}
+        for thread_count in thread_counts:
+            conn.execute(f"PRAGMA threads={thread_count}")
+            print(f"\n=== Running benchmarks with PRAGMA threads={thread_count} ===")
 
-        benchmark_outputs = []
-
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT cs.trajectory_id
-                FROM prototype2.trajectory_cs AS cs
-                JOIN prototype2.trajectory_ls AS ls
-                    ON ls.trajectory_id = cs.trajectory_id
-                WHERE ST_Length(ST_Transform(ls.geom, 3857)) > %s
-                ORDER BY random()
-                LIMIT %s
-                """,
-                (min_trajectory_length_m, trajectory_sample_size),
-            )
-            trajectory_ids = [row[0] for row in cur.fetchall()]
-            stop_ids = _fetch_random_ids(
-                cur,
-                "stop_id",
-                stop_source_table,
-                stop_sample_size,
-            )
-
-            if trajectory_ids:
-                cur.execute(
-                    "SELECT trajectory_id, "
-                    "ST_Length(ST_Transform(geom, 3857)) AS length_m, "
-                    "ST_Area(ST_Envelope(ST_Transform(geom, 3857))) AS mbr_area_m2 "
-                    "FROM prototype2.trajectory_ls WHERE trajectory_id = ANY(%s)",
-                    (trajectory_ids,)
-                )
-                for traj_id, length, mbr_area in cur.fetchall():
-                    if length is not None:
-                        traj_linestring_lengths.append(length)
-                        linestring_lengths_by_id[int(traj_id)] = float(length)
-                    if mbr_area is not None:
-                        linestring_mbr_areas_by_id[int(traj_id)] = float(mbr_area)
-
-                for zoom in ZOOM_LEVELS:
-                    cur.execute(
-                        f"SELECT trajectory_id, Cardinality(cellstring_{zoom}) "
-                        f"FROM {trajectory_source_table} WHERE trajectory_id = ANY(%s)",
-                        (trajectory_ids,)
+            for benchmark in run_plan:
+                bench_instance = benchmark
+                if (
+                    isinstance(bench_instance, TimeBenchmark)
+                    and bench_instance.use_area_ids
+                    and not bench_instance.area_ids
+                ):
+                    bench_instance = replace(
+                        bench_instance,
+                        area_ids=_get_area_ids(conn, area_id_source_table),
                     )
-                    for traj_id, count in cur.fetchall():
-                        if count is None:
-                            continue
-                        traj_cellstring_lengths[zoom].append(count)
-                        cellstring_lengths[zoom][int(traj_id)] = int(count)
-            if stop_ids:
-                cur.execute(
-                    "SELECT stop_id, ST_Area(ST_Transform(geom, 3857)) AS area_m2 "
-                    "FROM prototype2.stop_poly WHERE stop_id = ANY(%s)",
-                    (stop_ids,)
-                )
-                for stop_id, area in cur.fetchall():
-                    if area is None:
-                        continue
-                    stop_poly_area_size.append(area)
-                    stop_polygon_areas_by_id[int(stop_id)] = float(area)
 
-                for zoom in ZOOM_LEVELS:
-                    cur.execute(
-                        f"SELECT stop_id, Cardinality(cellstring_{zoom}) "
-                        f"FROM {stop_source_table} WHERE stop_id = ANY(%s)",
-                        (stop_ids,)
+                print(f"\nRunning benchmark: {bench_instance.name}")
+                tables_used = _collect_tables_from_benchmark(bench_instance)
+
+                if isinstance(bench_instance, TimeBenchmark):
+                    result = run_time_benchmark(
+                        conn,
+                        bench_instance,
+                        trajectory_ids=trajectory_ids,
+                        stop_ids=stop_ids,
                     )
-                    for stop_id, count in cur.fetchall():
-                        if count is None:
-                            continue
-                        stop_cellstring_lengths[zoom].append(count)
-                        stop_cellstring_cardinalities[zoom][int(stop_id)] = int(count)
-
-        for benchmark in RUN_PLAN:
-            bench_instance = benchmark
-            if isinstance(bench_instance, TimeBenchmark) and bench_instance.use_area_ids and not bench_instance.area_ids:
-                all_area_ids = _get_area_ids(conn)
-                bench_instance = replace(bench_instance, area_ids=all_area_ids)
-
-            print(f"\nRunning benchmark:", bench_instance.name)
-            tables_used = _collect_tables_from_benchmark(bench_instance)
-
-            if isinstance(bench_instance, TimeBenchmark):
-                if bench_instance.with_trajectory_ids:
-                    result = run_time_benchmark(conn, bench_instance, trajectory_ids=trajectory_ids)
-                elif bench_instance.with_stop_ids:
-                    result = run_time_benchmark(conn, bench_instance, stop_ids=stop_ids)
+                    print_time_result(result)
+                    serialized = _serialize_time_result(result)
+                    benchmark_type = "time"
+                elif isinstance(bench_instance, ValueBenchmark):
+                    result = run_value_benchmark(
+                        conn,
+                        bench_instance,
+                        trajectory_ids=trajectory_ids,
+                        stop_ids=stop_ids,
+                    )
+                    print_value_result(result)
+                    serialized = _serialize_value_result(result)
+                    benchmark_type = "value"
                 else:
-                    result = run_time_benchmark(conn, bench_instance)
-                print_time_result(result)
+                    continue
+
                 benchmark_outputs.append(
                     {
                         "name": bench_instance.name,
-                        "benchmark_type": "time",
+                        "benchmark_type": benchmark_type,
                         "tables_used": tables_used,
-                        "result": _serialize_time_result(result),
+                        "thread_count": thread_count,
+                        "result": serialized,
                     }
                 )
-            elif isinstance(bench_instance, ValueBenchmark):
-                result = run_value_benchmark(conn, bench_instance, trajectory_ids, stop_ids)
-                print_value_result(result)
-                benchmark_outputs.append(
-                    {
-                        "name": bench_instance.name,
-                        "benchmark_type": "value",
-                        "tables_used": tables_used,
-                        "result": _serialize_value_result(result),
-                    }
-                )
-
-        traj_stats_payload = []
-        stop_stats_payload = []
-
-        if traj_linestring_lengths:
-            traj_stats_payload.append(("LineString", traj_linestring_lengths))
-        for zoom in ZOOM_LEVELS:
-            lengths = traj_cellstring_lengths.get(zoom)
-            if lengths:
-                traj_stats_payload.append((f"CellString_{zoom}", lengths))
-        traj_stats_summary = _print_trajectory_stats(traj_stats_payload, len(trajectory_ids))
-
-        if stop_poly_area_size:
-            stop_stats_payload.append(("LineString", stop_poly_area_size))
-        for zoom in ZOOM_LEVELS:
-            lengths = stop_cellstring_lengths.get(zoom)
-            if lengths:
-                stop_stats_payload.append((f"CellString_{zoom}", lengths))
-        stop_stats_summary = _print_stop_stats(stop_stats_payload, len(stop_ids))
-
-        all_tables_used = sorted({table for entry in benchmark_outputs for table in entry["tables_used"]})
-
-        tested_types = []
-        if traj_stats_summary:
-            tested_types.extend(entry["label"] for entry in traj_stats_summary)
-        if stop_stats_summary:
-            tested_types.extend(entry["label"] for entry in stop_stats_summary)
 
         report = {
             "meta": {
                 "run_started_at": run_started_at.isoformat(),
+                "run_label": run_label,
+                "cache_state": cache_state,
+                "db_backend": "duckdb",
+                "duckdb_path": duckdb_path,
+                "linestring_schema": os.getenv("LINESTRING_SCHEMA", "p10"),
+                "cellstring_schema": cellstring_schema,
+                "thread_plan": thread_counts,
                 "trajectory_count": len(trajectory_ids),
                 "trajectory_ids": trajectory_ids,
                 "stop_count": len(stop_ids),
                 "stop_ids": stop_ids,
-                "zoom_levels": ZOOM_LEVELS,
-                "trajectory_stats": traj_stats_summary,
-                "stop_stats": stop_stats_summary,
-                "tested_types": tested_types,
-                "tables_used": all_tables_used,
-                "trajectory_linestring_lengths_m": {
-                    str(traj_id): length for traj_id, length in linestring_lengths_by_id.items()
-                },
-                "trajectory_cardinalities": {
-                    zoom: {str(traj_id): count for traj_id, count in counts.items()}
-                    for zoom, counts in cellstring_lengths.items()
-                    if counts
-                },
-                "trajectory_linestring_mbr_area_m2": {
-                    str(traj_id): area for traj_id, area in linestring_mbr_areas_by_id.items()
-                },
-                "stop_polygon_areas_m2": {
-                    str(stop_id): area for stop_id, area in stop_polygon_areas_by_id.items()
-                },
-                "stop_cardinalities": {
-                    zoom: {str(stop_id): count for stop_id, count in counts.items()}
-                    for zoom, counts in stop_cellstring_cardinalities.items()
-                    if counts
-                },
+                "cold_run_note": "For cold runs on Linux: sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches",
             },
             "benchmarks": benchmark_outputs,
         }
         _write_json_report(report, run_started_at)
-
     finally:
         conn.close()
+
 
 if __name__ == "__main__":
     main()

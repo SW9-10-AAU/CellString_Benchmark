@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 from statistics import median
@@ -18,19 +16,18 @@ class TimeBenchmark:
     repeats: int = 5
     with_trajectory_ids: bool = False
     with_stop_ids: bool = False
-    zoom_levels: List[str] = field(default_factory=list)
     area_ids: List[int] = field(default_factory=list)
     use_area_ids: bool = False
-    timeout_seconds: int = 120
 
 
 @dataclass(frozen=True)
 class ValueBenchmark:
     name: str
     sql: str
-    zoom_levels: List[str] = field(default_factory=list)
     with_trajectory_ids: bool = False
     with_stop_ids: bool = False
+    iterate_trajectory_ids: bool = False
+    iterate_stop_ids: bool = False
     params: Tuple[Any, ...] = tuple()
     capture_rows: bool = False
     row_field_names: Optional[List[str]] = None
@@ -39,9 +36,7 @@ class ValueBenchmark:
 @dataclass
 class RunOutcome:
     exec_ms_med: float
-    wall_ms_med: float
     rows: List[Tuple]
-    timed_out: bool = False
     samples: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -49,52 +44,37 @@ class RunOutcome:
 class TimeBenchmarkResult:
     name: str
     st: RunOutcome
-    cst_results: Dict[str, RunOutcome]
-    false_positives: Dict[str, int]
-    false_negatives: Dict[str, int]
+    cst: RunOutcome
+    false_positives: int
+    false_negatives: int
     per_area_results: Dict[int, Dict[str, RunOutcome]] = field(default_factory=dict)
-    match_counts: Dict[str, int] = field(default_factory=dict)
+    result_counts: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
 class ValueBenchmarkResult:
     name: str
     median_values: Dict[str, float]
-    rows_by_zoom: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    rows: List[Dict[str, Any]] = field(default_factory=list)
 
 
-def _discard_and_set(cur, statement_timeout_seconds: int | None = None) -> None:
-    # Must be outside a transaction. autocommit is set on the connection.
-    cur.execute("DISCARD ALL")
-    cur.execute("SET jit = off")
-    if statement_timeout_seconds is not None:
-        cur.execute(f"SET statement_timeout = '{statement_timeout_seconds}s'")
+def _reset_connection(cur) -> None:
+    # Keep settings deterministic between benchmark runs.
+    cur.execute("PRAGMA enable_progress_bar=false")
 
 
-def _explain_analyze_ms(
-        cur, sql: str, params: Sequence[Any], statement_timeout_seconds: int | None = None
-) -> Tuple[float, float]:
-    _discard_and_set(cur, statement_timeout_seconds)
-    cur.execute("EXPLAIN (ANALYZE, BUFFERS, TIMING ON, FORMAT JSON) " + sql, params)
-    payload = cur.fetchone()[0]
-    data = payload[0] if isinstance(payload, list) else json.loads(payload)[0]
-    return float(data.get("Planning Time", 0.0)), float(data.get("Execution Time", 0.0))
-
-
-def _fetch_all_with_wall_ms(
-        cur, sql: str, params: Sequence[Any], statement_timeout_seconds: int | None = None
+def _execute_with_timing(
+    cur, sql: str, params: Sequence[Any]
 ) -> Tuple[List[Tuple], float]:
-    _discard_and_set(cur, statement_timeout_seconds)
+    _reset_connection(cur)
     start = time.perf_counter()
     cur.execute(sql, params)
     rows = cur.fetchall()
     return rows, (time.perf_counter() - start) * 1000.0
 
 
-def _warmup(cur, sql: str, params: Sequence[Any], statement_timeout_seconds: int | None = None) -> None:
-    _discard_and_set(cur, statement_timeout_seconds)
-    cur.execute(sql, params)
-    cur.fetchall()
+def _warmup(cur, sql: str, params: Sequence[Any]) -> None:
+    _execute_with_timing(cur, sql, params)
 
 
 def _median_or_zero(values: Iterable[float]) -> float:
@@ -108,7 +88,9 @@ def _normalize_row_value(value: Any) -> Any:
     return value
 
 
-def _row_to_mapping(row: Sequence[Any], field_names: Optional[List[str]]) -> Dict[str, Any]:
+def _row_to_mapping(
+    row: Sequence[Any], field_names: Optional[List[str]]
+) -> Dict[str, Any]:
     mapping: Dict[str, Any] = {}
     if field_names:
         for idx, name in enumerate(field_names):
@@ -123,7 +105,6 @@ def _row_to_mapping(row: Sequence[Any], field_names: Optional[List[str]]) -> Dic
 def _aggregate_runs(runs: List[RunOutcome], rows: List[Tuple]) -> RunOutcome:
     return RunOutcome(
         exec_ms_med=_median_or_zero(r.exec_ms_med for r in runs),
-        wall_ms_med=_median_or_zero(r.wall_ms_med for r in runs),
         rows=rows,
         samples=[sample for run in runs for sample in run.samples],
     )
@@ -134,316 +115,254 @@ def _keyset(rows: Iterable[Tuple]) -> set:
 
 
 def _execute_random_or_repeated_queries(
-        cur,
-        sql: str,
-        params: Sequence[Any],
-        *,
-        repeats: int | None = None,
-        timeout_seconds: int | None,
-        trajectory_ids: List[int] | None = None,
-        stop_ids: List[int] | None = None,
-        sample_label: str | None = None,
+    cur,
+    sql: str,
+    params: Sequence[Any],
+    *,
+    repeats: int | None = None,
+    trajectory_ids: List[int] | None = None,
+    stop_ids: List[int] | None = None,
+    sample_label: str | None = None,
 ) -> RunOutcome:
     if trajectory_ids is not None and not trajectory_ids:
-        return RunOutcome(0.0, 0.0, [])
+        return RunOutcome(0.0, [])
 
     exec_times: List[float] = []
-    wall_times: List[float] = []
     collected_rows: List[Tuple] = []
     sample_records: List[Dict[str, Any]] = []
+    base_params: Tuple[Any, ...] = tuple(params)
+    run_repeats = repeats or 1
 
-    try:
-        if trajectory_ids is not None:
-            first_params = (trajectory_ids[0],) + params
-            _warmup(cur, sql, first_params, timeout_seconds)
+    if trajectory_ids is not None:
+        first_params = (trajectory_ids[0],) + base_params
+        _warmup(cur, sql, first_params)
 
-            for trajectory_id in trajectory_ids:
-                current_params = (trajectory_id,) + params
-                rows, wall_ms = _fetch_all_with_wall_ms(cur, sql, current_params, timeout_seconds)
-                _, exec_ms = _explain_analyze_ms(cur, sql, current_params)
-                exec_times.append(exec_ms)
-                wall_times.append(wall_ms)
-                collected_rows.extend(rows)
-                sample = {"trajectory_id": trajectory_id, "exec_ms": exec_ms}
-                if sample_label:
-                    sample["label"] = sample_label
-                sample_records.append(sample)
-        elif stop_ids is not None:
-            first_params = (stop_ids[0],) + params
-            _warmup(cur, sql, first_params, timeout_seconds)
+        for trajectory_id in trajectory_ids:
+            current_params = (trajectory_id,) + base_params
+            rows, exec_ms = _execute_with_timing(cur, sql, current_params)
+            exec_times.append(exec_ms)
+            collected_rows.extend(rows)
+            sample: Dict[str, Any] = {}
+            sample["trajectory_id"] = trajectory_id
+            sample["exec_ms"] = exec_ms
+            if sample_label:
+                sample["label"] = sample_label
+            sample_records.append(sample)
+    elif stop_ids is not None:
+        first_params = (stop_ids[0],) + base_params
+        _warmup(cur, sql, first_params)
 
-            for stop_id in stop_ids:
-                current_params = (stop_id,) + params
-                rows, wall_ms = _fetch_all_with_wall_ms(cur, sql, current_params, timeout_seconds)
-                _, exec_ms = _explain_analyze_ms(cur, sql, current_params)
-                exec_times.append(exec_ms)
-                wall_times.append(wall_ms)
-                collected_rows.extend(rows)
-                sample = {"stop_id": stop_id, "exec_ms": exec_ms}
-                if sample_label:
-                    sample["label"] = sample_label
-                sample_records.append(sample)
-        else:
-            _warmup(cur, sql, params, timeout_seconds)
-            rows, wall_ms = _fetch_all_with_wall_ms(cur, sql, params, timeout_seconds)
-            wall_times.append(wall_ms)
-            collected_rows = rows
-            for _ in range(repeats):
-                _, exec_ms = _explain_analyze_ms(cur, sql, params)
-                exec_times.append(exec_ms)
+        for stop_id in stop_ids:
+            current_params = (stop_id,) + base_params
+            rows, exec_ms = _execute_with_timing(cur, sql, current_params)
+            exec_times.append(exec_ms)
+            collected_rows.extend(rows)
+            sample: Dict[str, Any] = {}
+            sample["stop_id"] = stop_id
+            sample["exec_ms"] = exec_ms
+            if sample_label:
+                sample["label"] = sample_label
+            sample_records.append(sample)
+    else:
+        _warmup(cur, sql, base_params)
+        rows, _ = _execute_with_timing(cur, sql, base_params)
+        collected_rows = rows
+        for _ in range(run_repeats):
+            _, exec_ms = _execute_with_timing(cur, sql, base_params)
+            exec_times.append(exec_ms)
 
-        _discard_and_set(cur)
-        return RunOutcome(_median_or_zero(exec_times), _median_or_zero(wall_times), collected_rows, samples=sample_records)
-    except Exception as exc:
-        if timeout_seconds is None:
-            raise
-        is_timeout = "canceling statement due to statement timeout" in str(exc)
-        try:
-            cur.connection.rollback()
-            _discard_and_set(cur)
-        except Exception as rollback_exc:
-            print("Error during rollback after timeout:", rollback_exc)
-        if is_timeout:
-            return RunOutcome(0.0, 0.0, [], timed_out=True)
-        raise
+    _reset_connection(cur)
+    return RunOutcome(_median_or_zero(exec_times), collected_rows, samples=sample_records)
 
 
-def run_time_benchmark(connection, bench: TimeBenchmark, trajectory_ids: List[int] | None = None, stop_ids: List[int] | None = None) -> TimeBenchmarkResult:
-    connection.autocommit = True
-    connection.prepare_threshold = None
+def run_time_benchmark(
+    connection,
+    benchmark: TimeBenchmark,
+    trajectory_ids: List[int] | None = None,
+    stop_ids: List[int] | None = None,
+) -> TimeBenchmarkResult:
     per_area_results: Dict[int, Dict[str, RunOutcome]] = {}
 
-    with connection.cursor() as cur:
-        if bench.use_area_ids and bench.area_ids:
+    cur = connection.cursor()
+    try:
+        if benchmark.use_area_ids and benchmark.area_ids:
             st_rows: List[Tuple] = []
             valid_st_runs: List[RunOutcome] = []
-            cst_combined: Dict[str, List[Tuple]] = {zoom: [] for zoom in bench.zoom_levels}
-            cst_valid_runs: Dict[str, List[RunOutcome]] = {zoom: [] for zoom in bench.zoom_levels}
+            cst_rows: List[Tuple] = []
+            valid_cst_runs: List[RunOutcome] = []
 
-            for area_id in bench.area_ids:
-                area_params = (area_id,) + bench.params
+            for area_id in benchmark.area_ids:
+                area_params = (area_id,) + benchmark.params
                 st_run = _execute_random_or_repeated_queries(
-                    cur, bench.st_sql, area_params, repeats=bench.repeats, timeout_seconds=bench.timeout_seconds
+                    cur,
+                    benchmark.st_sql,
+                    area_params,
+                    repeats=benchmark.repeats,
                 )
-                per_area_results[area_id] = {"ST_": st_run}
-                if not st_run.timed_out:
-                    st_rows.extend(st_run.rows)
-                    valid_st_runs.append(st_run)
+                per_area_results[area_id] = {"st": st_run}
+                st_rows.extend(st_run.rows)
+                valid_st_runs.append(st_run)
 
-                for zoom in bench.zoom_levels:
-                    sql = bench.cst_sql.format(zoom=zoom)
-                    cst_run = _execute_random_or_repeated_queries(
-                        cur, sql, area_params, repeats=bench.repeats, timeout_seconds=bench.timeout_seconds
-                    )
-                    per_area_results[area_id][f"CST_{zoom}"] = cst_run
-                    if not cst_run.timed_out:
-                        cst_combined[zoom].extend(cst_run.rows)
-                        cst_valid_runs[zoom].append(cst_run)
+                cst_run = _execute_random_or_repeated_queries(
+                    cur,
+                    benchmark.cst_sql,
+                    area_params,
+                    repeats=benchmark.repeats,
+                )
+                per_area_results[area_id]["cst"] = cst_run
+                cst_rows.extend(cst_run.rows)
+                valid_cst_runs.append(cst_run)
 
             st_out = _aggregate_runs(valid_st_runs, st_rows)
-            cst_results = {
-                zoom: _aggregate_runs(cst_valid_runs[zoom], cst_combined[zoom]) for zoom in bench.zoom_levels
-            }
-        elif bench.with_trajectory_ids:
+            cst_out = _aggregate_runs(valid_cst_runs, cst_rows)
+        elif benchmark.with_trajectory_ids:
             st_out = _execute_random_or_repeated_queries(
                 cur,
-                bench.st_sql,
-                bench.params,
-                timeout_seconds=bench.timeout_seconds,
+                benchmark.st_sql,
+                benchmark.params,
                 trajectory_ids=trajectory_ids,
-                sample_label="ST_",
+                sample_label="LineString",
             )
-            cst_results = {}
-            for zoom in bench.zoom_levels:
-                sql = bench.cst_sql.format(zoom=zoom)
-                cst_results[zoom] = _execute_random_or_repeated_queries(
-                    cur,
-                    sql,
-                    bench.params,
-                    timeout_seconds=bench.timeout_seconds,
-                    trajectory_ids=trajectory_ids,
-                    sample_label=f"CST_{zoom}",
-                )
-        elif bench.with_stop_ids:
+            cst_out = _execute_random_or_repeated_queries(
+                cur,
+                benchmark.cst_sql,
+                benchmark.params,
+                trajectory_ids=trajectory_ids,
+                sample_label="CellString",
+            )
+        elif benchmark.with_stop_ids:
             st_out = _execute_random_or_repeated_queries(
                 cur,
-                bench.st_sql,
-                bench.params,
-                timeout_seconds=bench.timeout_seconds,
-                stop_ids=stop_ids
+                benchmark.st_sql,
+                benchmark.params,
+                stop_ids=stop_ids,
             )
-            cst_results = {}
-            for zoom in bench.zoom_levels:
-                sql = bench.cst_sql.format(zoom=zoom)
-                cst_results[zoom] = _execute_random_or_repeated_queries(
-                    cur,
-                    sql,
-                    bench.params,
-                    timeout_seconds=bench.timeout_seconds,
-                    stop_ids=stop_ids,
-                    sample_label=f"CST_{zoom}",
-                )
-        elif bench.with_stop_ids:
-            st_out = _execute_random_or_repeated_queries(
+            cst_out = _execute_random_or_repeated_queries(
                 cur,
-                bench.st_sql,
-                bench.params,
-                timeout_seconds=bench.timeout_seconds,
-                stop_ids=stop_ids
+                benchmark.cst_sql,
+                benchmark.params,
+                stop_ids=stop_ids,
+                sample_label="CellString",
             )
-            cst_results = {}
-            for zoom in bench.zoom_levels:
-                sql = bench.cst_sql.format(zoom=zoom)
-                cst_results[zoom] = _execute_random_or_repeated_queries(
-                    cur,
-                    sql,
-                    bench.params,
-                    timeout_seconds=bench.timeout_seconds,
-                    stop_ids=stop_ids
-                )
         else:
             st_out = _execute_random_or_repeated_queries(
-                cur, bench.st_sql, bench.params, repeats=bench.repeats, timeout_seconds=bench.timeout_seconds
+                cur,
+                benchmark.st_sql,
+                benchmark.params,
+                repeats=benchmark.repeats,
             )
-            cst_results = {}
-            if bench.zoom_levels:
-                for zoom in bench.zoom_levels:
-                    sql = bench.cst_sql.format(zoom=zoom)
-                    cst_results[zoom] = _execute_random_or_repeated_queries(
-                        cur, sql, bench.params, repeats=bench.repeats, timeout_seconds=bench.timeout_seconds
-                    )
-            else:
-                cst_results[""] = _execute_random_or_repeated_queries(
-                    cur, bench.cst_sql, bench.params, repeats=bench.repeats, timeout_seconds=bench.timeout_seconds
-                )
+            cst_out = _execute_random_or_repeated_queries(
+                cur,
+                benchmark.cst_sql,
+                benchmark.params,
+                repeats=benchmark.repeats,
+            )
+
+    finally:
+        cur.close()
 
     st_keys = _keyset(st_out.rows)
-    false_positives: Dict[str, int] = {}
-    false_negatives: Dict[str, int] = {}
-    match_counts: Dict[str, int] = {"LineString": len(st_keys)}
-
-    for zoom, cst_out in cst_results.items():
-        cst_keys = _keyset(cst_out.rows)
-        false_positives[zoom] = len(cst_keys - st_keys)
-        false_negatives[zoom] = len(st_keys - cst_keys)
-        match_counts[zoom] = len(cst_keys)
-
-    baseline_count = match_counts["LineString"]
-    false_positives["LineString"] = baseline_count
-    false_negatives["LineString"] = baseline_count
+    cst_keys = _keyset(cst_out.rows)
+    false_positives = len(cst_keys - st_keys)
+    false_negatives = len(st_keys - cst_keys)
+    result_counts: Dict[str, int] = {
+        "LineString": len(st_keys),
+        "CellString": len(cst_keys),
+    }
 
     return TimeBenchmarkResult(
-        bench.name,
+        benchmark.name,
         st_out,
-        cst_results,
+        cst_out,
         false_positives,
         false_negatives,
         per_area_results,
-        match_counts,
+        result_counts,
     )
 
 
 def run_value_benchmark(
-        connection,
-        bench: ValueBenchmark,
-        trajectory_ids: Optional[List[int]] = None,
-        stop_ids: Optional[List[int]] = None,
+    connection,
+    bench: ValueBenchmark,
+    trajectory_ids: Optional[List[int]] = None,
+    stop_ids: Optional[List[int]] = None,
 ) -> ValueBenchmarkResult:
-    connection.autocommit = True
-    connection.prepare_threshold = None
     trajectory_ids = trajectory_ids or []
     stop_ids = stop_ids or []
     median_values: Dict[str, float] = {}
-    rows_by_zoom: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    rows: List[Dict[str, Any]] = []
 
-    with connection.cursor() as cur:
-        if bench.zoom_levels:
-            for zoom in bench.zoom_levels:
-                zoom_level_int = int(zoom.replace("z", "")) if zoom else 0
-                sql = bench.sql.format(zoom=zoom, zoom_level=zoom_level_int)
-                values: List[float] = []
+    def _collect_value_rows(
+        query_rows: List[Tuple], *, numeric_values: List[float]
+    ) -> None:
+        for row in query_rows:
+            if not row:
+                continue
+            if bench.capture_rows:
+                rows.append(_row_to_mapping(row, bench.row_field_names))
+            if len(row) == 1:
+                try:
+                    numeric_values.append(float(row[0]))
+                except (TypeError, ValueError):
+                    continue
+            elif len(row) == 2 and isinstance(row[0], str):
+                try:
+                    median_values[str(row[0])] = float(row[1])
+                except (TypeError, ValueError):
+                    continue
 
-                if bench.with_trajectory_ids:
-                    if not trajectory_ids:
-                        continue
-                    for trajectory_id in trajectory_ids:
-                        cur.execute(sql, (trajectory_id, *bench.params))
-                        row = cur.fetchone()
-                        if row and row[0] is not None:
-                            values.append(float(row[0]))
-                        if bench.capture_rows and row:
-                            rows_by_zoom[zoom].append(_row_to_mapping(row, bench.row_field_names))
-                elif bench.with_stop_ids:
-                    if not stop_ids:
-                        continue
-                    for stop_id in stop_ids:
-                        cur.execute(sql, (stop_id, *bench.params))
-                        row = cur.fetchone()
-                        if row and row[0] is not None:
-                            values.append(float(row[0]))
-                        if bench.capture_rows and row:
-                            rows_by_zoom[zoom].append(_row_to_mapping(row, bench.row_field_names))
-                else:
-                    cur.execute(sql, bench.params)
-                    for row in cur.fetchall():
-                        if not row:
-                            continue
-                        if row[0] is not None:
-                            values.append(float(row[0]))
-                        if bench.capture_rows:
-                            rows_by_zoom[zoom].append(_row_to_mapping(row, bench.row_field_names))
+    cur = connection.cursor()
+    try:
+        value_samples: List[float] = []
 
-                if values:
-                    median_values[zoom] = median(values)
-        else:
-            params: Any = None
-            if bench.with_trajectory_ids:
-                if not trajectory_ids:
-                    return ValueBenchmarkResult(bench.name, {}, {})
-                params = {"trajectory_ids": trajectory_ids}
-            elif bench.with_stop_ids:
-                if not stop_ids:
-                    return ValueBenchmarkResult(bench.name, {}, {})
-                params = {"stop_ids": stop_ids}
-
-            if params is None:
-                cur.execute(bench.sql, bench.params)
+        if bench.with_trajectory_ids:
+            if not trajectory_ids:
+                return ValueBenchmarkResult(bench.name, {}, [])
+            if bench.iterate_trajectory_ids:
+                for trajectory_id in trajectory_ids:
+                    cur.execute(bench.sql, (trajectory_id, *bench.params))
+                    _collect_value_rows(cur.fetchall(), numeric_values=value_samples)
             else:
-                cur.execute(bench.sql, params)
+                cur.execute(bench.sql, (trajectory_ids, *bench.params))
+                _collect_value_rows(cur.fetchall(), numeric_values=value_samples)
+            if value_samples:
+                median_values["value"] = median(value_samples)
+        elif bench.with_stop_ids:
+            if not stop_ids:
+                return ValueBenchmarkResult(bench.name, {}, [])
+            if bench.iterate_stop_ids:
+                for stop_id in stop_ids:
+                    cur.execute(bench.sql, (stop_id, *bench.params))
+                    _collect_value_rows(cur.fetchall(), numeric_values=value_samples)
+            else:
+                cur.execute(bench.sql, (stop_ids, *bench.params))
+                _collect_value_rows(cur.fetchall(), numeric_values=value_samples)
+            if value_samples:
+                median_values["value"] = median(value_samples)
+        else:
+            cur.execute(bench.sql, bench.params)
+            _collect_value_rows(cur.fetchall(), numeric_values=value_samples)
+            if value_samples and "value" not in median_values:
+                median_values["value"] = median(value_samples)
 
-            for row in cur.fetchall():
-                if not row or len(row) < 2:
-                    continue
-                label, value = row[0], row[1]
-                if label is None or value is None:
-                    continue
-                median_values[str(label)] = float(value)
-                if bench.capture_rows:
-                    rows_by_zoom["default"].append(_row_to_mapping(row, bench.row_field_names))
+    finally:
+        cur.close()
 
-    return ValueBenchmarkResult(bench.name, median_values, dict(rows_by_zoom))
+    return ValueBenchmarkResult(bench.name, median_values, rows)
 
 
 def _print_run(label: str, run: RunOutcome, indent: str = "") -> None:
-    if run.timed_out:
-        print(f"{indent}{label}: (TIMEOUT)")
-    else:
-        print(f"{indent}{label}: exec_ms(median)={run.exec_ms_med}, wall_ms(median)={run.wall_ms_med}")
+    print(f"{indent}{label}: exec_ms(median)={run.exec_ms_med}")
 
 
 def print_time_result(result: TimeBenchmarkResult) -> None:
     print(f"\n--- {result.name} ---")
-    _print_run("ST_", result.st)
+    _print_run("LineString", result.st)
     print("----------------------------")
-    for zoom, cst_out in result.cst_results.items():
-        zoom_label = f"CST_{zoom}" if zoom else "CST_"
-        _print_run(zoom_label, cst_out)
-        if not cst_out.timed_out:
-            fp_key = zoom if zoom else ""
-            fn_key = zoom if zoom else ""
-            print(f"False positives ({zoom_label} \\ ST_): {result.false_positives[fp_key]}")
-            print(f"False negatives (ST_ \\ {zoom_label}): {result.false_negatives[fn_key]}")
-        print("----------------------------")
+    _print_run("CellString", result.cst)
+    print(f"False positives (CellString \\ LineString): {result.false_positives}")
+    print(f"False negatives (LineString \\ CellString): {result.false_negatives}")
+    print("----------------------------")
     if result.per_area_results:
         print("Per-area breakdown:")
         for area_id in sorted(result.per_area_results):
@@ -455,7 +374,6 @@ def print_time_result(result: TimeBenchmarkResult) -> None:
 
 def print_value_result(result: ValueBenchmarkResult) -> None:
     print(f"\n--- {result.name} ---")
-    for zoom, value in result.median_values.items():
-        zoom_label = f"Zoom {zoom}" if zoom else "No zoom"
-        print(f"{zoom_label}: median value = {value:.10f}")
+    for label, value in result.median_values.items():
+        print(f"{label}: median value = {value:.10f}")
     print("----------------------------")

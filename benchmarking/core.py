@@ -13,6 +13,10 @@ class TimeBenchmark:
     st_sql: str
     cst_sql: str
     params: Tuple[Any, ...] = tuple()
+    st_setup_sql: str = ""
+    cst_setup_sql: str = ""
+    st_setup_params: Tuple[Any, ...] = tuple()
+    cst_setup_params: Tuple[Any, ...] = tuple()
     repeats: int = 5
     with_trajectory_ids: bool = False
     with_stop_ids: bool = False
@@ -64,8 +68,16 @@ def _reset_connection(cur) -> None:
 
 
 def _execute_with_timing(
-    cur, sql: str, params: Sequence[Any]
+    cur,
+    sql: str,
+    params: Sequence[Any],
+    *,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
 ) -> Tuple[List[Tuple], float]:
+    if setup_sql:
+        _reset_connection(cur)
+        _run_setup_sql(cur, setup_sql, setup_params)
     _reset_connection(cur)
     start = time.perf_counter()
     cur.execute(sql, params)
@@ -73,8 +85,49 @@ def _execute_with_timing(
     return rows, (time.perf_counter() - start) * 1000.0
 
 
-def _warmup(cur, sql: str, params: Sequence[Any]) -> None:
-    _execute_with_timing(cur, sql, params)
+def _run_setup_sql(cur, setup_sql: str, setup_params: Sequence[Any]) -> None:
+    statements = [stmt.strip() for stmt in setup_sql.split(";") if stmt.strip()]
+    if not statements:
+        return
+
+    params_list = list(setup_params)
+    param_index = 0
+    for statement in statements:
+        placeholders = statement.count("?")
+        statement_params: Sequence[Any] = tuple()
+        if placeholders:
+            end_index = param_index + placeholders
+            if end_index > len(params_list):
+                raise ValueError(
+                    "setup_sql placeholders exceed provided setup_params "
+                    f"(needed at least {end_index}, got {len(params_list)})"
+                )
+            statement_params = tuple(params_list[param_index:end_index])
+            param_index = end_index
+        cur.execute(statement, statement_params)
+
+    if param_index != len(params_list):
+        raise ValueError(
+            "setup_params has unused values for setup_sql "
+            f"(used {param_index}, provided {len(params_list)})"
+        )
+
+
+def _warmup(
+    cur,
+    sql: str,
+    params: Sequence[Any],
+    *,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
+) -> None:
+    _execute_with_timing(
+        cur,
+        sql,
+        params,
+        setup_sql=setup_sql,
+        setup_params=setup_params,
+    )
 
 
 def _median_or_zero(values: Iterable[float]) -> float:
@@ -123,6 +176,8 @@ def _execute_random_or_repeated_queries(
     trajectory_ids: List[int] | None = None,
     stop_ids: List[int] | None = None,
     sample_label: str | None = None,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
 ) -> RunOutcome:
     if trajectory_ids is not None and not trajectory_ids:
         return RunOutcome(0.0, [])
@@ -135,11 +190,23 @@ def _execute_random_or_repeated_queries(
 
     if trajectory_ids is not None:
         first_params = (trajectory_ids[0],) + base_params
-        _warmup(cur, sql, first_params)
+        _warmup(
+            cur,
+            sql,
+            first_params,
+            setup_sql=setup_sql,
+            setup_params=setup_params,
+        )
 
         for trajectory_id in trajectory_ids:
             current_params = (trajectory_id,) + base_params
-            rows, exec_ms = _execute_with_timing(cur, sql, current_params)
+            rows, exec_ms = _execute_with_timing(
+                cur,
+                sql,
+                current_params,
+                setup_sql=setup_sql,
+                setup_params=setup_params,
+            )
             exec_times.append(exec_ms)
             collected_rows.extend(rows)
             sample: Dict[str, Any] = {}
@@ -150,11 +217,23 @@ def _execute_random_or_repeated_queries(
             sample_records.append(sample)
     elif stop_ids is not None:
         first_params = (stop_ids[0],) + base_params
-        _warmup(cur, sql, first_params)
+        _warmup(
+            cur,
+            sql,
+            first_params,
+            setup_sql=setup_sql,
+            setup_params=setup_params,
+        )
 
         for stop_id in stop_ids:
             current_params = (stop_id,) + base_params
-            rows, exec_ms = _execute_with_timing(cur, sql, current_params)
+            rows, exec_ms = _execute_with_timing(
+                cur,
+                sql,
+                current_params,
+                setup_sql=setup_sql,
+                setup_params=setup_params,
+            )
             exec_times.append(exec_ms)
             collected_rows.extend(rows)
             sample: Dict[str, Any] = {}
@@ -164,11 +243,29 @@ def _execute_random_or_repeated_queries(
                 sample["label"] = sample_label
             sample_records.append(sample)
     else:
-        _warmup(cur, sql, base_params)
-        rows, _ = _execute_with_timing(cur, sql, base_params)
+        _warmup(
+            cur,
+            sql,
+            base_params,
+            setup_sql=setup_sql,
+            setup_params=setup_params,
+        )
+        rows, _ = _execute_with_timing(
+            cur,
+            sql,
+            base_params,
+            setup_sql=setup_sql,
+            setup_params=setup_params,
+        )
         collected_rows = rows
         for _ in range(run_repeats):
-            _, exec_ms = _execute_with_timing(cur, sql, base_params)
+            _, exec_ms = _execute_with_timing(
+                cur,
+                sql,
+                base_params,
+                setup_sql=setup_sql,
+                setup_params=setup_params,
+            )
             exec_times.append(exec_ms)
 
     _reset_connection(cur)
@@ -198,6 +295,8 @@ def run_time_benchmark(
                     benchmark.st_sql,
                     area_params,
                     repeats=benchmark.repeats,
+                    setup_sql=benchmark.st_setup_sql,
+                    setup_params=benchmark.st_setup_params,
                 )
                 per_area_results[area_id] = {"st": st_run}
                 st_rows.extend(st_run.rows)
@@ -208,6 +307,8 @@ def run_time_benchmark(
                     benchmark.cst_sql,
                     area_params,
                     repeats=benchmark.repeats,
+                    setup_sql=benchmark.cst_setup_sql,
+                    setup_params=benchmark.cst_setup_params,
                 )
                 per_area_results[area_id]["cst"] = cst_run
                 cst_rows.extend(cst_run.rows)
@@ -222,6 +323,8 @@ def run_time_benchmark(
                 benchmark.params,
                 trajectory_ids=trajectory_ids,
                 sample_label="LineString",
+                setup_sql=benchmark.st_setup_sql,
+                setup_params=benchmark.st_setup_params,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
@@ -229,6 +332,8 @@ def run_time_benchmark(
                 benchmark.params,
                 trajectory_ids=trajectory_ids,
                 sample_label="CellString",
+                setup_sql=benchmark.cst_setup_sql,
+                setup_params=benchmark.cst_setup_params,
             )
         elif benchmark.with_stop_ids:
             st_out = _execute_random_or_repeated_queries(
@@ -236,6 +341,8 @@ def run_time_benchmark(
                 benchmark.st_sql,
                 benchmark.params,
                 stop_ids=stop_ids,
+                setup_sql=benchmark.st_setup_sql,
+                setup_params=benchmark.st_setup_params,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
@@ -243,6 +350,8 @@ def run_time_benchmark(
                 benchmark.params,
                 stop_ids=stop_ids,
                 sample_label="CellString",
+                setup_sql=benchmark.cst_setup_sql,
+                setup_params=benchmark.cst_setup_params,
             )
         else:
             st_out = _execute_random_or_repeated_queries(
@@ -250,12 +359,16 @@ def run_time_benchmark(
                 benchmark.st_sql,
                 benchmark.params,
                 repeats=benchmark.repeats,
+                setup_sql=benchmark.st_setup_sql,
+                setup_params=benchmark.st_setup_params,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
                 benchmark.cst_sql,
                 benchmark.params,
                 repeats=benchmark.repeats,
+                setup_sql=benchmark.cst_setup_sql,
+                setup_params=benchmark.cst_setup_params,
             )
 
     finally:

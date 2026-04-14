@@ -25,28 +25,34 @@ def _window(start: datetime, days: int) -> tuple[str, str]:
     return (start.isoformat(sep=" "), end.isoformat(sep=" "))
 
 
-ST_SQL = """
-WITH bounds AS (
-    SELECT CAST(? AS TIMESTAMP) AS t_start, CAST(? AS TIMESTAMP) AS t_end
-),
-selected_areas AS (
-    SELECT area_id, geom
+ST_SETUP_SQL = """
+SET VARIABLE t_start = CAST(? AS TIMESTAMP);
+SET VARIABLE t_end = CAST(? AS TIMESTAMP);
+SET VARIABLE area_id = ?;
+SET VARIABLE target_geom = (
+    SELECT geom
     FROM {area_poly_table}
-    WHERE area_id = ?
-)
-SELECT DISTINCT t.mmsi, t.trajectory_id, CAST(NULL AS INTEGER) AS stop_id, a.area_id, 'trajectory' AS source
+    WHERE area_id = getvariable('area_id')
+);
+"""
+
+ST_SETUP_SQL = ST_SETUP_SQL.format(area_poly_table=AREA_POLY_TABLE)
+
+ST_SQL = """
+SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, a.area_id, 'trajectory' AS source
 FROM {trajectory_ls_table} AS t
-JOIN selected_areas AS a ON ST_Intersects(t.geom, a.geom)
-CROSS JOIN bounds AS b
-WHERE t.ts_start <= b.t_end
-  AND t.ts_end >= b.t_start
+JOIN {area_poly_table} AS a ON a.area_id = getvariable('area_id')
+WHERE ST_Intersects(t.geom, getvariable('target_geom'))
+  AND t.ts_start <= getvariable('t_end')
+  AND t.ts_end >= getvariable('t_start')
+
 UNION ALL
-SELECT DISTINCT s.mmsi, CAST(NULL AS INTEGER) AS trajectory_id, s.stop_id, a.area_id, 'stop' AS source
+
+SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, getvariable('area_id'), 'stop' AS source
 FROM {stop_poly_table} AS s
-JOIN selected_areas AS a ON ST_Intersects(s.geom, a.geom)
-CROSS JOIN bounds AS b
-WHERE s.ts_start <= b.t_end
-  AND s.ts_end >= b.t_start;
+WHERE ST_Intersects(s.geom, getvariable('target_geom'))
+  AND s.ts_start <= getvariable('t_end')
+  AND s.ts_end >= getvariable('t_start');
 """
 
 ST_SQL = ST_SQL.format(
@@ -55,27 +61,31 @@ ST_SQL = ST_SQL.format(
     stop_poly_table=STOP_POLY_TABLE,
 )
 
+
+CST_SETUP_SQL = """
+SET VARIABLE t_start = CAST(? AS TIMESTAMP);
+SET VARIABLE t_end = CAST(? AS TIMESTAMP);
+SET VARIABLE area_id = ?;
+"""
+
 CST_SQL = """
-WITH bounds AS (
-    SELECT CAST(? AS TIMESTAMP) AS t_start, CAST(? AS TIMESTAMP) AS t_end
-),
-selected_area AS (
+WITH selected_area AS (
     SELECT area_id, cell_z21
     FROM {area_cs_table}
-    WHERE area_id = ?
+    WHERE area_id = getvariable('area_id')
 )
-SELECT DISTINCT t.mmsi, t.trajectory_id, CAST(NULL AS INTEGER) AS stop_id, a.area_id, 'trajectory' AS source
+SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, a.area_id, 'trajectory' AS source
 FROM {trajectory_cs_table} AS t
 JOIN selected_area AS a ON t.cell_z21 = a.cell_z21
-CROSS JOIN bounds AS b
-WHERE t.ts BETWEEN b.t_start AND b.t_end
+WHERE t.ts BETWEEN getvariable('t_start') AND getvariable('t_end')
+
 UNION ALL
-SELECT DISTINCT s.mmsi, CAST(NULL AS INTEGER) AS trajectory_id, s.stop_id, a.area_id, 'stop' AS source
+
+SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, a.area_id, 'stop' AS source
 FROM {stop_cs_table} AS s
 JOIN selected_area AS a ON s.cell_z21 = a.cell_z21
-CROSS JOIN bounds AS b
-WHERE s.ts_start <= b.t_end
-  AND s.ts_end >= b.t_start;
+WHERE s.ts_start <= getvariable('t_end')
+  AND s.ts_end >= getvariable('t_start');
 """
 
 CST_SQL = CST_SQL.format(
@@ -85,26 +95,35 @@ CST_SQL = CST_SQL.format(
 )
 
 
-def build_spatio_temporal_range_benchmark(label: str, days: int, area_id: int) -> TimeBenchmark:
+def build_spatio_temporal_range_benchmark(
+    label: str, days: int, area_id: int
+) -> TimeBenchmark:
     start = _parse_start()
     t_start, t_end = _window(start, days)
     return TimeBenchmark(
         name=f"Spatio-temporal range query - area {area_id} ({label})",
         st_sql=ST_SQL,
         cst_sql=CST_SQL,
-        params=(t_start, t_end, area_id),
+        st_setup_sql=ST_SETUP_SQL,
+        cst_setup_sql=CST_SETUP_SQL,
+        st_setup_params=(t_start, t_end, area_id),
+        cst_setup_params=(t_start, t_end, area_id),
+        params=tuple(),
         repeats=5,
     )
 
 
-SPATIO_TEMPORAL_RANGE_BENCHMARKS: List[TimeBenchmark] = [
-    build_spatio_temporal_range_benchmark("1 day", 1, area_id)
-    for area_id in (1, 2, 3)
-] + [
-    build_spatio_temporal_range_benchmark("1 week", 7, area_id)
-    for area_id in (1, 2, 3)
-] + [
-    build_spatio_temporal_range_benchmark("1 month", 30, area_id)
-    for area_id in (1, 2, 3)
-]
-
+SPATIO_TEMPORAL_RANGE_BENCHMARKS: List[TimeBenchmark] = (
+    [
+        build_spatio_temporal_range_benchmark("1 day", 1, area_id)
+        for area_id in (1, 2, 3)
+    ]
+    + [
+        build_spatio_temporal_range_benchmark("1 week", 7, area_id)
+        for area_id in (1, 2, 3)
+    ]
+    + [
+        build_spatio_temporal_range_benchmark("1 month", 30, area_id)
+        for area_id in (1, 2, 3)
+    ]
+)

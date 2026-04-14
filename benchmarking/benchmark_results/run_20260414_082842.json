@@ -1,0 +1,580 @@
+{
+  "meta": {
+    "run_started_at": "2026-04-14T08:28:42.281435+00:00",
+    "run_label": "local",
+    "cache_state": "warm",
+    "db_backend": "duckdb",
+    "duckdb_path": "benchmark_cellstring.duckdb",
+    "linestring_schema": "cellstring_ls",
+    "cellstring_schema": "cellstring_cs",
+    "thread_plan": [
+      1,
+      12
+    ],
+    "trajectory_count": 0,
+    "trajectory_ids": [],
+    "stop_count": 0,
+    "stop_ids": [],
+    "cold_run_note": "For cold runs on Linux: sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches"
+  },
+  "benchmarks": [
+    {
+      "name": "Spatio-temporal range query - area 1 (1 day)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 202.885
+        },
+        "cst": {
+          "exec_ms_med": 851.254
+        },
+        "false_positives": 0,
+        "false_negatives": 9,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 23,
+          "CellString": 14
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 2 (1 day)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 170.122
+        },
+        "cst": {
+          "exec_ms_med": 812.863
+        },
+        "false_positives": 0,
+        "false_negatives": 51,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 113,
+          "CellString": 62
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 day)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 157.384
+        },
+        "cst": {
+          "exec_ms_med": 926.067
+        },
+        "false_positives": 0,
+        "false_negatives": 64,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 171,
+          "CellString": 107
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 1 (1 week)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 194.714
+        },
+        "cst": {
+          "exec_ms_med": 9160.002
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 55,
+          "CellString": 55
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 2 (1 week)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 162.466
+        },
+        "cst": {
+          "exec_ms_med": 7266.486
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 313,
+          "CellString": 313
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 week)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 152.435
+        },
+        "cst": {
+          "exec_ms_med": 5286.388
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 471,
+          "CellString": 471
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 1 (1 month)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 187.554
+        },
+        "cst": {
+          "exec_ms_med": 7718.956
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 55,
+          "CellString": 55
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 2 (1 month)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 179.255
+        },
+        "cst": {
+          "exec_ms_med": 11332.134
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 313,
+          "CellString": 313
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 month)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 180.259
+        },
+        "cst": {
+          "exec_ms_med": 7894.387
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 471,
+          "CellString": 471
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 1 (1 day)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 197.231
+        },
+        "cst": {
+          "exec_ms_med": 152.477
+        },
+        "false_positives": 0,
+        "false_negatives": 9,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 23,
+          "CellString": 14
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 2 (1 day)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 157.778
+        },
+        "cst": {
+          "exec_ms_med": 151.467
+        },
+        "false_positives": 0,
+        "false_negatives": 51,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 113,
+          "CellString": 62
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 day)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 145.223
+        },
+        "cst": {
+          "exec_ms_med": 162.189
+        },
+        "false_positives": 0,
+        "false_negatives": 64,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 171,
+          "CellString": 107
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 1 (1 week)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 196.61
+        },
+        "cst": {
+          "exec_ms_med": 870.842
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 55,
+          "CellString": 55
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 2 (1 week)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 166.677
+        },
+        "cst": {
+          "exec_ms_med": 943.934
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 313,
+          "CellString": 313
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 week)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 165.856
+        },
+        "cst": {
+          "exec_ms_med": 1044.746
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 471,
+          "CellString": 471
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 1 (1 month)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 200.109
+        },
+        "cst": {
+          "exec_ms_med": 1302.374
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 55,
+          "CellString": 55
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 2 (1 month)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 159.024
+        },
+        "cst": {
+          "exec_ms_med": 917.039
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 313,
+          "CellString": 313
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 month)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "bounds",
+        "cellstring_cs.area_cs",
+        "cellstring_cs.stop_cs",
+        "cellstring_cs.trajectory_cs",
+        "cellstring_ls.area_poly",
+        "cellstring_ls.stop_poly",
+        "cellstring_ls.trajectory_ls",
+        "selected_area",
+        "selected_areas"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "exec_ms_med": 157.277
+        },
+        "cst": {
+          "exec_ms_med": 963.177
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_area_results": {},
+        "result_counts": {
+          "LineString": 471,
+          "CellString": 471
+        }
+      }
+    }
+  ]
+}

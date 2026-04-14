@@ -81,11 +81,16 @@ Parameter style for DuckDB is `?` (not `%s`).
 
 ## Graphs
 
+Set `DEFAULT_REPORT_JSON` in `benchmarking/graphs/graph_generation.py` if you want a fixed JSON file without passing it on the command line. Leave it as `None` to auto-pick the newest report.
+
 ```bash
 python -m benchmarking.graphs.graph_generation
 python -m benchmarking.graphs.graph_generation benchmarking/benchmark_results/run_xxxxxxxx_xxxxxx.json
 python -m benchmarking.graphs.graph_generation --benchmark="Template benchmark: LineString vs CellString"
 python -m benchmarking.graphs.graph_generation --plot=exec_time_bars
 python -m benchmarking.graphs.graph_generation --plot=cell_count_exec_time
+python -m benchmarking.graphs.graph_generation --plot=spatio_temporal_range_facets
 ```
+
+`spatio_temporal_range_facets` creates a 3-panel line chart for `1 day`, `1 week`, and `1 month` windows. Each panel uses area size (`Small`, `Medium`, `Large`) on the x-axis and median execution time on the y-axis.
 

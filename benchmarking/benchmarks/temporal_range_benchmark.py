@@ -24,21 +24,28 @@ def _window(start: datetime, days: int) -> tuple[str, str]:
     return (start.isoformat(sep=" "), end.isoformat(sep=" "))
 
 
+ST_SETUP_SQL = """
+SET VARIABLE t_start = CAST(? AS TIMESTAMP);
+SET VARIABLE t_end = CAST(? AS TIMESTAMP);
+"""
+
+
+CST_SETUP_SQL = """
+SET VARIABLE t_start = CAST(? AS TIMESTAMP);
+SET VARIABLE t_end = CAST(? AS TIMESTAMP);
+"""
+
+
 ST_SQL = """
-WITH bounds AS (
-    SELECT CAST(? AS TIMESTAMP) AS t_start, CAST(? AS TIMESTAMP) AS t_end
-)
-SELECT DISTINCT t.mmsi, t.trajectory_id, CAST(NULL AS INTEGER) AS stop_id, 'trajectory' AS source
+SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_ls_table} AS t
-CROSS JOIN bounds AS b
-WHERE t.ts_start <= b.t_end
-  AND t.ts_end >= b.t_start
+WHERE t.ts_start <= getvariable('t_end')
+  AND t.ts_end >= getvariable('t_start')
 UNION ALL
-SELECT DISTINCT s.mmsi, CAST(NULL AS INTEGER) AS trajectory_id, s.stop_id, 'stop' AS source
+SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS source
 FROM {stop_poly_table} AS s
-CROSS JOIN bounds AS b
-WHERE s.ts_start <= b.t_end
-  AND s.ts_end >= b.t_start;
+WHERE s.ts_start <= getvariable('t_end')
+  AND s.ts_end >= getvariable('t_start');
 """
 
 ST_SQL = ST_SQL.format(
@@ -47,19 +54,16 @@ ST_SQL = ST_SQL.format(
 )
 
 CST_SQL = """
-WITH bounds AS (
-    SELECT CAST(? AS TIMESTAMP) AS t_start, CAST(? AS TIMESTAMP) AS t_end
-)
-SELECT DISTINCT t.mmsi, t.trajectory_id, CAST(NULL AS INTEGER) AS stop_id, 'trajectory' AS source
+SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_cs_table} AS t
-CROSS JOIN bounds AS b
-WHERE t.ts BETWEEN b.t_start AND b.t_end
+WHERE t.ts BETWEEN getvariable('t_start') AND getvariable('t_end')
+
 UNION ALL
-SELECT DISTINCT s.mmsi, CAST(NULL AS INTEGER) AS trajectory_id, s.stop_id, 'stop' AS source
+
+SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS source
 FROM {stop_cs_table} AS s
-CROSS JOIN bounds AS b
-WHERE s.ts_start <= b.t_end
-  AND s.ts_end >= b.t_start;
+WHERE s.ts_start <= getvariable('t_end')
+  AND s.ts_end >= getvariable('t_start');
 """
 
 CST_SQL = CST_SQL.format(
@@ -75,7 +79,11 @@ def build_temporal_range_benchmark(label: str, days: int) -> TimeBenchmark:
         name=f"Temporal range query ({label})",
         st_sql=ST_SQL,
         cst_sql=CST_SQL,
-        params=(t_start, t_end),
+        st_setup_sql=ST_SETUP_SQL,
+        cst_setup_sql=CST_SETUP_SQL,
+        st_setup_params=(t_start, t_end),
+        cst_setup_params=(t_start, t_end),
+        params=tuple(),
         repeats=5,
     )
 

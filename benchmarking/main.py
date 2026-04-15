@@ -73,6 +73,47 @@ def _benchmark_filters() -> List[str]:
     return [name.strip() for name in csv.split(",") if name.strip()]
 
 
+def _normalize_filter_token(token: str) -> str:
+    normalized = token.strip().strip('"').strip("'").lower()
+    normalized = re.sub(r"[\s_]+", "-", normalized)
+    normalized = re.sub(r"-+", "-", normalized)
+    return normalized
+
+
+def _is_benchmark_type_match(benchmark_name: str, type_token: str) -> bool:
+    type_prefixes = {
+        "temporal-range": "Temporal range query",
+        "spatial-range": "Spatial range query",
+        "spatio-temporal-range": "Spatio-temporal range query",
+    }
+    prefix = type_prefixes.get(type_token)
+    return bool(prefix and benchmark_name.startswith(prefix))
+
+
+def _resolve_run_plan_filters(run_plan: List[object], filters: List[str]) -> List[object]:
+    if not filters:
+        return run_plan
+
+    normalized_filters = {_normalize_filter_token(item) for item in filters}
+    explicit_name_filters = set(filters)
+
+    selected = []
+    for bench in run_plan:
+        bench_name = getattr(bench, "name", "")
+        bench_name_normalized = _normalize_filter_token(bench_name)
+        matches_type = any(
+            _is_benchmark_type_match(bench_name, filter_token)
+            for filter_token in normalized_filters
+        )
+        matches_name = (
+            bench_name in explicit_name_filters
+            or bench_name_normalized in normalized_filters
+        )
+        if matches_type or matches_name:
+            selected.append(bench)
+    return selected
+
+
 def _cache_state() -> str:
     state = os.getenv("CACHE_STATE", "warm").strip().lower()
     return state if state in {"warm", "cold"} else "warm"
@@ -191,11 +232,14 @@ def main() -> None:
         )
         return
 
-    benchmark_filters = set(_benchmark_filters())
+    benchmark_filters = _benchmark_filters()
     if benchmark_filters:
-        run_plan = [bench for bench in RUN_PLAN if bench.name in benchmark_filters]
+        run_plan = _resolve_run_plan_filters(RUN_PLAN, benchmark_filters)
         if not run_plan:
             print("No benchmarks matched BENCHMARKS in .env.")
+            print(
+                "Valid type filters: temporal-range, spatial-range, spatio-temporal-range"
+            )
             print("Available benchmarks:")
             for bench in RUN_PLAN:
                 print(f"- {bench.name}")

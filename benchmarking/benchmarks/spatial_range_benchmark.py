@@ -8,7 +8,6 @@ from benchmarking.table_config import (
     TRAJECTORY_LS_TABLE,
 )
 
-
 ST_SETUP_SQL = """
 SET VARIABLE area_id = ?;
 """
@@ -73,5 +72,5 @@ def build_spatial_range_benchmark(area_id: int) -> TimeBenchmark:
 
 
 SPATIAL_RANGE_BENCHMARKS = [
-    build_spatial_range_benchmark(area_id) for area_id in (1, 2, 3)
+    build_spatial_range_benchmark(area_id) for area_id in (1, 2, 3, 4, 5, 6)
 ]

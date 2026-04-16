@@ -116,14 +116,14 @@ def build_spatio_temporal_range_benchmark(
 SPATIO_TEMPORAL_RANGE_BENCHMARKS: List[TimeBenchmark] = (
     [
         build_spatio_temporal_range_benchmark("1 day", 1, area_id)
-        for area_id in (1, 2, 3)
+        for area_id in (1, 2, 3, 4, 5, 6)
     ]
     + [
         build_spatio_temporal_range_benchmark("1 week", 7, area_id)
-        for area_id in (1, 2, 3)
+        for area_id in (1, 2, 3, 4, 5, 6)
     ]
     + [
         build_spatio_temporal_range_benchmark("1 month", 30, area_id)
-        for area_id in (1, 2, 3)
+        for area_id in (1, 2, 3, 4, 5, 6)
     ]
 )

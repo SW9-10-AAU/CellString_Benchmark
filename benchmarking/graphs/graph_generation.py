@@ -46,6 +46,23 @@ SPATIAL_AREA_GROUPS = {
     5: ("Medium", "low"),
     6: ("Large", "low"),
 }
+SPATIAL_AREA_ORDER = ["Small", "Medium", "Large"]
+_AREA_NAME_TO_SHORT = {"Small": "S", "Medium": "M", "Large": "L"}
+THREAD_PATTERN_SEQUENCE = ["", "/", "x", "-", "+", ".", "\\"]
+
+
+def _traffic_for_area_id(area_id: int) -> Optional[str]:
+    area_info = SPATIAL_AREA_GROUPS.get(area_id)
+    if area_info is None:
+        return None
+    return area_info[1]
+
+
+def _spatio_temporal_area_label(area_id: int) -> str:
+    area_info = SPATIAL_AREA_GROUPS.get(area_id)
+    if area_info is not None:
+        return _AREA_NAME_TO_SHORT.get(area_info[0], f"Area {area_id}")
+    return AREA_SIZE_LABELS.get(area_id, f"Area {area_id}")
 
 
 def _next_output_path(base_name: str, extension: str = ".pdf") -> Path:
@@ -123,9 +140,34 @@ def _parse_thread_filters(selected: Optional[List[str]]) -> Optional[List[int]]:
     return deduped or None
 
 
+def _parse_traffic_filter(selected: Optional[List[str]]) -> Optional[str]:
+    if not selected:
+        return None
+
+    chosen: Optional[str] = None
+    for raw in selected:
+        token = raw.strip().lower()
+        if not token:
+            continue
+        if token not in {"high", "low"}:
+            raise ValueError(f"Invalid traffic value: {raw}. Use 'high' or 'low'.")
+        # Last value wins to match CLI override behavior.
+        chosen = token
+    return chosen
+
+
 def _cellstring_series_name(meta: Dict[str, Any]) -> str:
-    configured = str(meta.get("cellstring_schema") or "").strip()
-    return configured or FALLBACK_CELLSTRING_SERIES
+    # Keep chart naming stable regardless of schema name in the benchmark metadata.
+    _ = meta
+    return FALLBACK_CELLSTRING_SERIES
+
+
+def _thread_label(thread_count: int) -> str:
+    return f"{thread_count} thread" if int(thread_count) == 1 else f"{thread_count} threads"
+
+
+def _series_thread_label(series: str, thread_count: int) -> str:
+    return f"{series} - {_thread_label(thread_count)}"
 
 
 def _series_color_map(series_names: List[str]) -> Dict[str, str]:
@@ -305,6 +347,7 @@ def plot_spatio_temporal_range_facets(
     benchmarks: List[Dict[str, Any]],
     meta: Dict[str, Any],
     selected_threads: Optional[List[int]] = None,
+    selected_traffic: Optional[str] = None,
 ) -> None:
     rows: List[Dict[str, Any]] = []
     cst_series = _cellstring_series_name(meta)
@@ -326,11 +369,15 @@ def plot_spatio_temporal_range_facets(
             continue
 
         area_id = int(match.group("area_id"))
+        area_traffic = _traffic_for_area_id(area_id)
+        if selected_traffic in {"low", "high"} and area_traffic != selected_traffic:
+            continue
+
         window = match.group("window").strip().lower()
         if window not in window_order:
             continue
 
-        area_label = AREA_SIZE_LABELS.get(area_id, f"Area {area_id}")
+        area_label = _spatio_temporal_area_label(area_id)
         thread_count = int(bench.get("thread_count") or 1)
         if thread_filter and thread_count not in thread_filter:
             continue
@@ -361,13 +408,18 @@ def plot_spatio_temporal_range_facets(
             )
 
     if not rows:
+        if selected_traffic in {"low", "high"}:
+            print(
+                f"No spatio-temporal range benchmark data found for {selected_traffic} traffic; skipping facet bar chart."
+            )
+            return
         if thread_filter:
             print(
-                "Requested thread filters were not found in spatio-temporal data; skipping facet line chart."
+                "Requested thread filters were not found in spatio-temporal data; skipping facet bar chart."
             )
         else:
             print(
-                "No spatio-temporal range benchmark data found; skipping facet line chart."
+                "No spatio-temporal range benchmark data found; skipping facet bar chart."
             )
         return
 
@@ -381,6 +433,14 @@ def plot_spatio_temporal_range_facets(
         int(n) for n in df["thread_count"].dropna().unique().tolist()
     )
     has_thread_scaling = len(thread_count_unique) > 1
+    if effective_threads:
+        preferred_order = [
+            int(n) for n in effective_threads if int(n) in set(thread_count_unique)
+        ]
+        remaining = [n for n in thread_count_unique if n not in set(preferred_order)]
+        thread_count_order = preferred_order + remaining
+    else:
+        thread_count_order = thread_count_unique
 
     fig_kwargs: Dict[str, Any] = {
         "data_frame": df,
@@ -388,8 +448,8 @@ def plot_spatio_temporal_range_facets(
         "y": "exec_ms",
         "log_y": True,
         "color": "series",
+        "barmode": "group",
         "facet_col": "window",
-        "markers": True,
         "category_orders": {
             "window": window_order,
             "area": area_order,
@@ -403,14 +463,25 @@ def plot_spatio_temporal_range_facets(
         },
     }
     if has_thread_scaling:
-        fig_kwargs["line_dash"] = "thread_label"
+        fig_kwargs["pattern_shape"] = "thread_label"
+        # First thread is solid; subsequent threads get different textures.
+        fig_kwargs["pattern_shape_sequence"] = ["", "/", "x", "-", "+", ".", "\\"]
         fig_kwargs["category_orders"]["thread_label"] = [
             f"{int(n)} thread" if int(n) == 1 else f"{int(n)} threads"
-            for n in thread_count_unique
+            for n in thread_count_order
         ]
 
-    fig = px.line(**fig_kwargs)
+    fig = px.bar(**fig_kwargs)
     fig.update_layout(width=1350, height=750)
+
+    # Normalize PX legend labels to: "Series - x thread(s)".
+    for trace in fig.data:
+        if not isinstance(trace.name, str):
+            continue
+        if "," in trace.name:
+            parts = [part.strip() for part in trace.name.split(",", 1)]
+            if len(parts) == 2:
+                trace.name = f"{parts[0]} - {parts[1]}"
 
     # Clean facet labels from "window=..." to simple "1 day", "1 week", "1 month".
     fig.for_each_annotation(
@@ -424,17 +495,18 @@ def plot_spatio_temporal_range_facets(
     _apply_transparent_theme(fig, show_grid=True, left_legend=True)
     output_path = _next_output_path("spatio_temporal_range_facets")
     fig.write_image(output_path)
-    print(f"Wrote spatio-temporal facet chart to {output_path}")
+    print(f"Wrote spatio-temporal facet bar chart to {output_path}")
 
 
 def plot_spatial_range_dual_axis(
     benchmarks: List[Dict[str, Any]],
     meta: Dict[str, Any],
     selected_threads: Optional[List[int]] = None,
+    selected_traffic: Optional[str] = None,
 ) -> None:
     rows: List[Dict[str, Any]] = []
     cst_series = _cellstring_series_name(meta)
-    area_order = [AREA_SIZE_LABELS[1], AREA_SIZE_LABELS[2], AREA_SIZE_LABELS[3]]
+    area_order = SPATIAL_AREA_ORDER
     effective_threads = (
         selected_threads if selected_threads is not None else DEFAULT_SPATIAL_THREADS
     )
@@ -488,6 +560,14 @@ def plot_spatial_range_dual_axis(
         return
 
     df = pd.DataFrame(rows)
+    if selected_traffic in {"low", "high"}:
+        df = df[df["traffic"] == selected_traffic].copy()
+        if df.empty:
+            print(
+                f"No spatial range benchmark data found for {selected_traffic} traffic; skipping chart."
+            )
+            return
+
     df = (
         df.groupby(["area", "traffic", "series", "thread_count"], as_index=False)[
             "exec_ms"
@@ -495,6 +575,92 @@ def plot_spatial_range_dual_axis(
         .median()
         .sort_values(["area", "series", "thread_count", "traffic"])
     )
+
+    if selected_traffic in {"low", "high"}:
+        thread_order = (
+            effective_threads
+            if effective_threads
+            else sorted(int(n) for n in df["thread_count"].unique().tolist())
+        )
+        thread_order = [
+            t for t in thread_order if t in set(df["thread_count"].tolist())
+        ]
+        if not thread_order:
+            print("Requested thread filters were not found in report; skipping chart.")
+            return
+
+        positive_vals = [float(v) for v in df["exec_ms"].tolist() if float(v) > 0.0]
+        if not positive_vals:
+            print(
+                "Spatial range values are non-positive; cannot render log y-axis chart."
+            )
+            return
+
+        base_colors = {
+            LINESTRING_SERIES: LINESTRING_COLOR,
+            cst_series: px.colors.qualitative.Safe[1],
+        }
+        series_order = [LINESTRING_SERIES, cst_series]
+
+        fig = go.Figure()
+        for idx, thread_count in enumerate(thread_order):
+            for series_idx, series in enumerate(series_order):
+                subset = df[
+                    (df["series"] == series) & (df["thread_count"] == thread_count)
+                ].copy()
+                if subset.empty:
+                    continue
+
+                subset["area"] = pd.Categorical(
+                    subset["area"], categories=area_order, ordered=True
+                )
+                subset = subset.sort_values("area")
+
+                color = base_colors[series]
+                legend_name = _series_thread_label(series, thread_count)
+                pattern_shape = THREAD_PATTERN_SEQUENCE[idx % len(THREAD_PATTERN_SEQUENCE)]
+                marker: Dict[str, Any] = {"color": color}
+                if pattern_shape:
+                    marker["pattern"] = {"shape": pattern_shape}
+
+                fig.add_trace(
+                    go.Bar(
+                        x=subset["area"].tolist(),
+                        y=subset["exec_ms"].astype(float).tolist(),
+                        name=legend_name,
+                        legendgroup=f"{series}_{thread_count}",
+                        offsetgroup=f"{series}_{thread_count}",
+                        legendrank=10 + (idx * len(series_order)) + series_idx,
+                        marker=marker,
+                        hovertemplate="<b>%{x}</b><br>Execution median: %{y:.2f} ms<extra></extra>",
+                    )
+                )
+
+        fig.update_layout(
+            barmode="group",
+            width=1450,
+            height=760,
+            xaxis=dict(
+                categoryorder="array",
+                categoryarray=area_order,
+            ),
+            yaxis=dict(
+                title="Execution median (ms)",
+                type="log",
+            ),
+        )
+
+        _apply_transparent_theme(fig, show_grid=True, left_legend=True)
+        fig.update_layout(margin=dict(l=80, r=120, t=25, b=10))
+        fig.update_yaxes(type="log")
+        fig.update_layout(legend_tracegroupgap=0)
+
+        output_path = _next_output_path(f"spatial_range_dual_axis_{selected_traffic}")
+        fig.write_image(output_path)
+        print(
+            f"Wrote spatial-range chart ({selected_traffic} traffic) to {output_path}"
+        )
+        return
 
     pivot = (
         df.pivot_table(
@@ -536,15 +702,12 @@ def plot_spatial_range_dual_axis(
         return
 
     y_min = min(positive_vals)
-    y_max = max(positive_vals) * 1.15
-    log_range = [math.log10(y_min), math.log10(y_max)]
 
     base_colors = {
         LINESTRING_SERIES: LINESTRING_COLOR,
         cst_series: px.colors.qualitative.Safe[1],
     }
     series_order = [LINESTRING_SERIES, cst_series]
-    n_threads = len(thread_order)
 
     fig = go.Figure()
 
@@ -578,8 +741,8 @@ def plot_spatial_range_dual_axis(
         )
     )
 
-    for series in series_order:
-        for idx, thread_count in enumerate(thread_order):
+    for idx, thread_count in enumerate(thread_order):
+        for series_idx, series in enumerate(series_order):
             subset = pivot[
                 (pivot["series"] == series) & (pivot["thread_count"] == thread_count)
             ].copy()
@@ -591,16 +754,20 @@ def plot_spatial_range_dual_axis(
             )
             subset = subset.sort_values("area")
 
-            shade = 0.0 if n_threads == 1 else (0.55 * idx / (n_threads - 1))
-            color = _lighten_hex(base_colors[series], shade)
-            thread_label = (
-                f"{thread_count} thread"
-                if int(thread_count) == 1
-                else f"{thread_count} threads"
-            )
-            legend_name = f"{series} ({thread_label})"
+            color = base_colors[series]
+            legend_name = _series_thread_label(series, thread_count)
             offset_group_low = f"{series}_{thread_count}_low"
             offset_group_high = f"{series}_{thread_count}_high"
+            pattern_shape = THREAD_PATTERN_SEQUENCE[idx % len(THREAD_PATTERN_SEQUENCE)]
+            high_marker: Dict[str, Any] = {"color": color}
+            low_marker: Dict[str, Any] = {
+                "color": color,
+                "opacity": 0.45,
+                "line": {"color": color, "width": 2},
+            }
+            if pattern_shape:
+                high_marker["pattern"] = {"shape": pattern_shape}
+                low_marker["pattern"] = {"shape": pattern_shape, "fgopacity": 0.55}
 
             low_vals = subset["low"].astype(float).tolist()
             high_vals = subset["high"].astype(float).tolist()
@@ -613,12 +780,7 @@ def plot_spatial_range_dual_axis(
                     legendgroup=f"{series}_{thread_count}",
                     offsetgroup=offset_group_low,
                     showlegend=False,
-                    marker=dict(
-                        color=color,
-                        opacity=0.45,
-                        pattern=dict(shape="/", fgopacity=0.55),
-                        line=dict(color=color, width=2),
-                    ),
+                    marker=low_marker,
                     hovertemplate="<b>%{x}</b><br>Low traffic median: %{y:.2f} ms<extra></extra>",
                 )
             )
@@ -629,8 +791,8 @@ def plot_spatial_range_dual_axis(
                     name=legend_name,
                     legendgroup=f"{series}_{thread_count}",
                     offsetgroup=offset_group_high,
-                    marker=dict(color=color),
-                    legendrank=10 + idx,
+                    marker=high_marker,
+                    legendrank=10 + (idx * len(series_order)) + series_idx,
                     hovertemplate="<b>%{x}</b><br>High traffic median: %{y:.2f} ms<extra></extra>",
                 )
             )
@@ -644,14 +806,15 @@ def plot_spatial_range_dual_axis(
             categoryarray=area_order,
         ),
         yaxis=dict(
-            title="Median execution time (ms)",
+            title="Execution median (ms)",
             type="log",
-            range=log_range,
         ),
     )
 
     _apply_transparent_theme(fig, show_grid=True, left_legend=True)
     fig.update_layout(margin=dict(l=80, r=120, t=25, b=10))
+    fig.update_yaxes(type="log")
+    fig.update_layout(legend_tracegroupgap=0)
 
     output_path = _next_output_path("spatial_range_dual_axis")
     fig.write_image(output_path)
@@ -879,6 +1042,7 @@ def run_all_graphs(
     selected_benchmarks: Optional[List[str]] = None,
     selected_plots: Optional[List[str]] = None,
     selected_threads: Optional[List[int]] = None,
+    selected_traffic: Optional[str] = None,
 ) -> None:
     data = _load_report(report_path)
     benchmarks = _filter_benchmarks(data["benchmarks"], selected_benchmarks)
@@ -911,6 +1075,7 @@ def run_all_graphs(
             benchmarks,
             data.get("meta", {}),
             selected_threads=selected_threads,
+            selected_traffic=selected_traffic,
         )
 
     if wants("spatial_range_dual_axis"):
@@ -918,6 +1083,7 @@ def run_all_graphs(
             benchmarks,
             data.get("meta", {}),
             selected_threads=selected_threads,
+            selected_traffic=selected_traffic,
         )
 
 
@@ -926,9 +1092,16 @@ def main(
     benchmarks: Optional[List[str]] = None,
     plots: Optional[List[str]] = None,
     threads: Optional[List[int]] = None,
+    traffic: Optional[str] = None,
 ) -> None:
     report_path = _ensure_report_path(path_arg)
-    run_all_graphs(report_path, benchmarks, plots, selected_threads=threads)
+    run_all_graphs(
+        report_path,
+        benchmarks,
+        plots,
+        selected_threads=threads,
+        selected_traffic=traffic,
+    )
 
 
 if __name__ == "__main__":
@@ -937,6 +1110,7 @@ if __name__ == "__main__":
     benchmark_filters: List[str] = []
     plot_filters: List[str] = []
     thread_filters: List[str] = []
+    traffic_filters: List[str] = []
 
     for arg in args:
         if arg.startswith("--benchmark="):
@@ -957,10 +1131,26 @@ if __name__ == "__main__":
             thread_filters.extend(
                 filter(None, (name.strip() for name in arg.split("=", 1)[1].split(",")))
             )
+        elif arg.startswith("--traffic="):
+            traffic_filters.append(arg.split("=", 1)[1])
+        elif arg in {
+            "--high-traffic",
+            "--low-traffic",
+            "-high-traffic",
+            "-low-traffic",
+        }:
+            raise ValueError("Use --traffic=high or --traffic=low.")
         elif report_arg is None:
             report_arg = arg
         else:
             benchmark_filters.append(arg)
 
     parsed_threads = _parse_thread_filters(thread_filters)
-    main(report_arg, benchmark_filters or None, plot_filters or None, parsed_threads)
+    parsed_traffic = _parse_traffic_filter(traffic_filters)
+    main(
+        report_arg,
+        benchmark_filters or None,
+        plot_filters or None,
+        parsed_threads,
+        traffic=parsed_traffic,
+    )

@@ -90,7 +90,11 @@ python -m benchmarking.graphs.graph_generation --benchmark="Template benchmark: 
 python -m benchmarking.graphs.graph_generation --plot=exec_time_bars
 python -m benchmarking.graphs.graph_generation --plot=cell_count_exec_time
 python -m benchmarking.graphs.graph_generation --plot=spatio_temporal_range_facets
+python -m benchmarking.graphs.graph_generation --plot=spatial_range_dual_axis
+python -m benchmarking.graphs.graph_generation --plot=spatial_range_dual_axis --threads=1,40
 ```
 
 `spatio_temporal_range_facets` creates a 3-panel line chart for `1 day`, `1 week`, and `1 month` windows. Each panel uses area size (`Small`, `Medium`, `Large`) on the x-axis and median execution time on the y-axis.
+
+`spatial_range_dual_axis` creates grouped stacked bars for area size (`Small`, `Medium`, `Large`) where the solid segment is low-traffic median (`area_id` 4/5/6) and the textured segment above it extends to the high-traffic median (`area_id` 1/2/3). Use `--threads=` to limit the shown thread runs (for example `--threads=1,40`).
 

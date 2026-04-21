@@ -46,9 +46,9 @@ SPATIAL_AREA_GROUPS = {
     1: ("Small", "high"),
     2: ("Medium", "high"),
     3: ("Large", "high"),
-    4: ("Small", "low"),
-    5: ("Medium", "low"),
-    6: ("Large", "low"),
+    7: ("Small", "low"),
+    8: ("Medium", "low"),
+    9: ("Large", "low"),
 }
 SPATIAL_AREA_ORDER = ["Small", "Medium", "Large"]
 _AREA_NAME_TO_SHORT = {"Small": "S", "Medium": "M", "Large": "L"}
@@ -180,6 +180,16 @@ def _thread_label(thread_count: int) -> str:
 
 def _series_thread_label(series: str, thread_count: int) -> str:
     return f"{series} - {_thread_label(thread_count)}"
+
+
+def _is_primary_series_thread(
+    series: str, thread_count: int, primary_thread_count: Optional[int]
+) -> bool:
+    if series != LINESTRING_SERIES:
+        return True
+    if primary_thread_count is None:
+        return True
+    return int(thread_count) == int(primary_thread_count)
 
 
 def _series_color_map(series_names: List[str]) -> Dict[str, str]:
@@ -455,7 +465,6 @@ def plot_spatio_temporal_range_facets(
     thread_count_unique = sorted(
         int(n) for n in df["thread_count"].dropna().unique().tolist()
     )
-    has_thread_scaling = len(thread_count_unique) > 1
     if effective_threads:
         preferred_order = [
             int(n) for n in effective_threads if int(n) in set(thread_count_unique)
@@ -464,6 +473,18 @@ def plot_spatio_temporal_range_facets(
         thread_count_order = preferred_order + remaining
     else:
         thread_count_order = thread_count_unique
+
+    primary_thread_count = thread_count_order[0] if thread_count_order else None
+    if primary_thread_count is not None:
+        df = df[
+            (df["series"] != LINESTRING_SERIES)
+            | (df["thread_count"].astype(int) == int(primary_thread_count))
+        ].copy()
+
+    thread_count_unique = sorted(
+        int(n) for n in df["thread_count"].dropna().unique().tolist()
+    )
+    has_thread_scaling = len(thread_count_unique) > 1
 
     fig_kwargs: Dict[str, Any] = {
         "data_frame": df,
@@ -626,9 +647,14 @@ def plot_spatial_range_dual_axis(
         }
         series_order = [LINESTRING_SERIES, cst_series]
 
+        primary_thread_count = thread_order[0] if thread_order else None
         fig = go.Figure()
         for idx, thread_count in enumerate(thread_order):
             for series_idx, series in enumerate(series_order):
+                if not _is_primary_series_thread(
+                    series, thread_count, primary_thread_count
+                ):
+                    continue
                 subset = df[
                     (df["series"] == series) & (df["thread_count"] == thread_count)
                 ].copy()
@@ -768,8 +794,11 @@ def plot_spatial_range_dual_axis(
         )
     )
 
+    primary_thread_count = thread_order[0] if thread_order else None
     for idx, thread_count in enumerate(thread_order):
         for series_idx, series in enumerate(series_order):
+            if not _is_primary_series_thread(series, thread_count, primary_thread_count):
+                continue
             subset = pivot[
                 (pivot["series"] == series) & (pivot["thread_count"] == thread_count)
             ].copy()
@@ -936,9 +965,12 @@ def plot_temporal_range_grouped(
     }
     series_order = [LINESTRING_SERIES, cst_series]
 
+    primary_thread_count = thread_order[0] if thread_order else None
     fig = go.Figure()
     for idx, thread_count in enumerate(thread_order):
         for series_idx, series in enumerate(series_order):
+            if not _is_primary_series_thread(series, thread_count, primary_thread_count):
+                continue
             subset = df[
                 (df["series"] == series) & (df["thread_count"] == thread_count)
             ].copy()

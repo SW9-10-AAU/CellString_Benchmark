@@ -38,6 +38,10 @@ SPATIAL_RANGE_NAME_PATTERN = re.compile(
     r"^Spatial range query - area\s+(?P<area_id>\d+)$",
     re.IGNORECASE,
 )
+TEMPORAL_RANGE_NAME_PATTERN = re.compile(
+    r"^Temporal range query\s*\((?P<window>[^)]+)\)$",
+    re.IGNORECASE,
+)
 SPATIAL_AREA_GROUPS = {
     1: ("Small", "high"),
     2: ("Medium", "high"),
@@ -49,6 +53,10 @@ SPATIAL_AREA_GROUPS = {
 SPATIAL_AREA_ORDER = ["Small", "Medium", "Large"]
 _AREA_NAME_TO_SHORT = {"Small": "S", "Medium": "M", "Large": "L"}
 THREAD_PATTERN_SEQUENCE = ["", "/", "x", "-", "+", ".", "\\"]
+PATTERN_FG_COLOR = "rgba(0,0,0,1.0)"
+PATTERN_FG_OPACITY = 1.0
+PATTERN_SIZE = 10
+PATTERN_SOLIDITY = 0.15
 
 
 def _traffic_for_area_id(area_id: int) -> Optional[str]:
@@ -163,7 +171,11 @@ def _cellstring_series_name(meta: Dict[str, Any]) -> str:
 
 
 def _thread_label(thread_count: int) -> str:
-    return f"{thread_count} thread" if int(thread_count) == 1 else f"{thread_count} threads"
+    return (
+        f"{thread_count} thread"
+        if int(thread_count) == 1
+        else f"{thread_count} threads"
+    )
 
 
 def _series_thread_label(series: str, thread_count: int) -> str:
@@ -296,6 +308,17 @@ def _apply_transparent_theme(
                 x=0.02,
             ),
         )
+
+
+def _enhance_bar_pattern_visibility(fig) -> None:
+    # Stronger pattern foreground improves readability in legend swatches.
+    fig.update_traces(
+        marker_pattern_fgcolor=PATTERN_FG_COLOR,
+        marker_pattern_fgopacity=PATTERN_FG_OPACITY,
+        marker_pattern_size=PATTERN_SIZE,
+        marker_pattern_solidity=PATTERN_SOLIDITY,
+        selector=dict(type="bar"),
+    )
 
 
 def plot_exec_time_bars(benchmarks: List[Dict[str, Any]], meta: Dict[str, Any]) -> None:
@@ -465,7 +488,7 @@ def plot_spatio_temporal_range_facets(
     if has_thread_scaling:
         fig_kwargs["pattern_shape"] = "thread_label"
         # First thread is solid; subsequent threads get different textures.
-        fig_kwargs["pattern_shape_sequence"] = ["", "/", "x", "-", "+", ".", "\\"]
+        fig_kwargs["pattern_shape_sequence"] = THREAD_PATTERN_SEQUENCE
         fig_kwargs["category_orders"]["thread_label"] = [
             f"{int(n)} thread" if int(n) == 1 else f"{int(n)} threads"
             for n in thread_count_order
@@ -493,6 +516,7 @@ def plot_spatio_temporal_range_facets(
     )
 
     _apply_transparent_theme(fig, show_grid=True, left_legend=True)
+    _enhance_bar_pattern_visibility(fig)
     output_path = _next_output_path("spatio_temporal_range_facets")
     fig.write_image(output_path)
     print(f"Wrote spatio-temporal facet bar chart to {output_path}")
@@ -618,7 +642,9 @@ def plot_spatial_range_dual_axis(
 
                 color = base_colors[series]
                 legend_name = _series_thread_label(series, thread_count)
-                pattern_shape = THREAD_PATTERN_SEQUENCE[idx % len(THREAD_PATTERN_SEQUENCE)]
+                pattern_shape = THREAD_PATTERN_SEQUENCE[
+                    idx % len(THREAD_PATTERN_SEQUENCE)
+                ]
                 marker: Dict[str, Any] = {"color": color}
                 if pattern_shape:
                     marker["pattern"] = {"shape": pattern_shape}
@@ -651,6 +677,7 @@ def plot_spatial_range_dual_axis(
         )
 
         _apply_transparent_theme(fig, show_grid=True, left_legend=True)
+        _enhance_bar_pattern_visibility(fig)
         fig.update_layout(margin=dict(l=80, r=120, t=25, b=10))
         fig.update_yaxes(type="log")
         fig.update_layout(legend_tracegroupgap=0)
@@ -812,6 +839,7 @@ def plot_spatial_range_dual_axis(
     )
 
     _apply_transparent_theme(fig, show_grid=True, left_legend=True)
+    _enhance_bar_pattern_visibility(fig)
     fig.update_layout(margin=dict(l=80, r=120, t=25, b=10))
     fig.update_yaxes(type="log")
     fig.update_layout(legend_tracegroupgap=0)
@@ -819,6 +847,142 @@ def plot_spatial_range_dual_axis(
     output_path = _next_output_path("spatial_range_dual_axis")
     fig.write_image(output_path)
     print(f"Wrote spatial-range dual-axis chart to {output_path}")
+
+
+def plot_temporal_range_grouped(
+    benchmarks: List[Dict[str, Any]],
+    meta: Dict[str, Any],
+    selected_threads: Optional[List[int]] = None,
+) -> None:
+    rows: List[Dict[str, Any]] = []
+    cst_series = _cellstring_series_name(meta)
+    window_order = ["1 day", "1 week", "1 month"]
+    effective_threads = (
+        selected_threads
+        if selected_threads is not None
+        else DEFAULT_SPATIO_TEMPORAL_THREADS
+    )
+    thread_filter = set(effective_threads or [])
+
+    for bench in benchmarks:
+        if bench.get("benchmark_type") != "time":
+            continue
+
+        name = str(bench.get("name") or "")
+        match = TEMPORAL_RANGE_NAME_PATTERN.match(name)
+        if not match:
+            continue
+
+        window = match.group("window").strip().lower()
+        if window not in window_order:
+            continue
+
+        thread_count = int(bench.get("thread_count") or 1)
+        if thread_filter and thread_count not in thread_filter:
+            continue
+
+        result = bench.get("result", {})
+        st_exec = result.get("st", {}).get("exec_ms_med")
+        cst_exec = result.get("cst", {}).get("exec_ms_med")
+
+        if st_exec is not None:
+            rows.append(
+                {
+                    "window": window,
+                    "series": LINESTRING_SERIES,
+                    "thread_count": thread_count,
+                    "exec_ms": float(st_exec),
+                }
+            )
+        if cst_exec is not None:
+            rows.append(
+                {
+                    "window": window,
+                    "series": cst_series,
+                    "thread_count": thread_count,
+                    "exec_ms": float(cst_exec),
+                }
+            )
+
+    if not rows:
+        if thread_filter:
+            print(
+                "Requested thread filters were not found in temporal range data; skipping grouped chart."
+            )
+        else:
+            print("No temporal range benchmark data found; skipping grouped chart.")
+        return
+
+    df = pd.DataFrame(rows)
+    thread_order = (
+        effective_threads
+        if effective_threads
+        else sorted(int(n) for n in df["thread_count"].dropna().unique().tolist())
+    )
+    thread_order = [t for t in thread_order if t in set(df["thread_count"].tolist())]
+    if not thread_order:
+        print("Requested thread filters were not found in report; skipping chart.")
+        return
+
+    positive_vals = [float(v) for v in df["exec_ms"].tolist() if float(v) > 0.0]
+    if not positive_vals:
+        print("Temporal range values are non-positive; cannot render log y-axis chart.")
+        return
+
+    df["window"] = pd.Categorical(df["window"], categories=window_order, ordered=True)
+    base_colors = {
+        LINESTRING_SERIES: LINESTRING_COLOR,
+        cst_series: px.colors.qualitative.Safe[1],
+    }
+    series_order = [LINESTRING_SERIES, cst_series]
+
+    fig = go.Figure()
+    for idx, thread_count in enumerate(thread_order):
+        for series_idx, series in enumerate(series_order):
+            subset = df[
+                (df["series"] == series) & (df["thread_count"] == thread_count)
+            ].copy()
+            if subset.empty:
+                continue
+
+            subset = subset.sort_values("window")
+            color = base_colors[series]
+            pattern_shape = THREAD_PATTERN_SEQUENCE[idx % len(THREAD_PATTERN_SEQUENCE)]
+            marker: Dict[str, Any] = {"color": color}
+            if pattern_shape:
+                marker["pattern"] = {"shape": pattern_shape}
+
+            fig.add_trace(
+                go.Bar(
+                    x=subset["window"].astype(str).tolist(),
+                    y=subset["exec_ms"].astype(float).tolist(),
+                    name=_series_thread_label(series, thread_count),
+                    legendgroup=f"{series}_{thread_count}",
+                    offsetgroup=f"{series}_{thread_count}",
+                    legendrank=10 + (idx * len(series_order)) + series_idx,
+                    marker=marker,
+                    hovertemplate="<b>%{x}</b><br>Execution median: %{y:.2f} ms<extra></extra>",
+                )
+            )
+
+    fig.update_layout(
+        barmode="group",
+        width=1350,
+        height=750,
+        xaxis=dict(
+            categoryorder="array",
+            categoryarray=window_order,
+        ),
+        yaxis=dict(title="Execution median (ms)", type="log"),
+    )
+    _apply_transparent_theme(fig, show_grid=True, left_legend=True)
+    _enhance_bar_pattern_visibility(fig)
+    fig.update_layout(margin=dict(l=80, r=120, t=25, b=10), legend_tracegroupgap=0)
+    fig.update_yaxes(type="log")
+
+    output_path = _next_output_path("temporal_range_grouped")
+    fig.write_image(output_path)
+    print(f"Wrote temporal-range grouped chart to {output_path}")
 
 
 def plot_false_match_counts(benchmarks: List[Dict[str, Any]]) -> None:
@@ -1084,6 +1248,13 @@ def run_all_graphs(
             data.get("meta", {}),
             selected_threads=selected_threads,
             selected_traffic=selected_traffic,
+        )
+
+    if wants("temporal_range_grouped"):
+        plot_temporal_range_grouped(
+            benchmarks,
+            data.get("meta", {}),
+            selected_threads=selected_threads,
         )
 
 

@@ -85,6 +85,7 @@ def _is_benchmark_type_match(benchmark_name: str, type_token: str) -> bool:
         "temporal-range": "Temporal range query",
         "spatial-range": "Spatial range query",
         "spatio-temporal-range": "Spatio-temporal range query",
+        "transit-query": "Transit query",
     }
     prefix = type_prefixes.get(type_token)
     return bool(prefix and benchmark_name.startswith(prefix))
@@ -238,7 +239,7 @@ def main() -> None:
         if not run_plan:
             print("No benchmarks matched BENCHMARKS in .env.")
             print(
-                "Valid type filters: temporal-range, spatial-range, spatio-temporal-range"
+                "Valid type filters: temporal-range, spatial-range, spatio-temporal-range, transit-query"
             )
             print("Available benchmarks:")
             for bench in RUN_PLAN:

@@ -1,5 +1,4 @@
 import json
-import math
 import re
 import sys
 from pathlib import Path
@@ -57,6 +56,8 @@ PATTERN_FG_COLOR = "rgba(0,0,0,1.0)"
 PATTERN_FG_OPACITY = 1.0
 PATTERN_SIZE = 10
 PATTERN_SOLIDITY = 0.15
+LINESTRING_COUNT_COLOR = "#1f4fa3"
+CELLSTRING_COUNT_COLOR = "#b23a2b"
 
 
 def _traffic_for_area_id(area_id: int) -> Optional[str]:
@@ -180,6 +181,39 @@ def _thread_label(thread_count: int) -> str:
 
 def _series_thread_label(series: str, thread_count: int) -> str:
     return f"{series} - {_thread_label(thread_count)}"
+
+
+def _to_float_or_none(value: Any) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_count_pair(result: Dict[str, Any]) -> Dict[str, float]:
+    counts = result.get("result_counts") or result.get("match_counts") or {}
+    st_count = _to_float_or_none(counts.get(LINESTRING_SERIES))
+    cst_count = _to_float_or_none(counts.get(FALLBACK_CELLSTRING_SERIES))
+    out: Dict[str, float] = {}
+    if st_count is not None:
+        out[LINESTRING_SERIES] = st_count
+    if cst_count is not None:
+        out[FALLBACK_CELLSTRING_SERIES] = cst_count
+    return out
+
+
+def _format_count_text(value: float) -> str:
+    base = str(int(value)) if float(value).is_integer() else f"{value:.2f}"
+    return f"<b>{base}</b>"
+
+
+def _count_line_color_map(cst_series: str) -> Dict[str, str]:
+    return {
+        LINESTRING_SERIES: LINESTRING_COUNT_COLOR,
+        cst_series: CELLSTRING_COUNT_COLOR,
+    }
 
 
 def _is_primary_series_thread(
@@ -383,6 +417,7 @@ def plot_spatio_temporal_range_facets(
     selected_traffic: Optional[str] = None,
 ) -> None:
     rows: List[Dict[str, Any]] = []
+    count_rows: List[Dict[str, Any]] = []
     cst_series = _cellstring_series_name(meta)
     window_order = ["1 day", "1 week", "1 month"]
     area_order = [AREA_SIZE_LABELS[1], AREA_SIZE_LABELS[2], AREA_SIZE_LABELS[3]]
@@ -418,6 +453,7 @@ def plot_spatio_temporal_range_facets(
         result = bench.get("result", {})
         st_exec = result.get("st", {}).get("exec_ms_med")
         cst_exec = result.get("cst", {}).get("exec_ms_med")
+        count_pair = _extract_count_pair(result)
 
         if st_exec is not None:
             rows.append(
@@ -437,6 +473,19 @@ def plot_spatio_temporal_range_facets(
                     "series": cst_series,
                     "exec_ms": float(cst_exec),
                     "thread_count": thread_count,
+                }
+            )
+        for series_name, count_value in count_pair.items():
+            normalized_series = (
+                cst_series if series_name == FALLBACK_CELLSTRING_SERIES else series_name
+            )
+            count_rows.append(
+                {
+                    "window": window,
+                    "area": area_label,
+                    "series": normalized_series,
+                    "thread_count": thread_count,
+                    "count": float(count_value),
                 }
             )
 
@@ -538,6 +587,75 @@ def plot_spatio_temporal_range_facets(
 
     _apply_transparent_theme(fig, show_grid=True, left_legend=True)
     _enhance_bar_pattern_visibility(fig)
+
+    # Add right-side count lines (one pair per facet) using the primary thread only.
+    if count_rows and thread_count_order:
+        count_color_map = _count_line_color_map(cst_series)
+        primary_thread = int(thread_count_order[0])
+        counts_df = pd.DataFrame(count_rows)
+        counts_df = counts_df[counts_df["thread_count"].astype(int) == primary_thread].copy()
+        counts_df = counts_df.sort_values(["window", "area", "series"]).drop_duplicates(
+            subset=["window", "area", "series"], keep="first"
+        )
+        canonical_count_axis = f"y{len(window_order) + len(window_order)}"
+
+        for facet_idx, window in enumerate(window_order, start=1):
+            facet_counts = counts_df[counts_df["window"] == window].copy()
+            if facet_counts.empty:
+                continue
+
+            xaxis_ref = "x" if facet_idx == 1 else f"x{facet_idx}"
+            yaxis_ref = f"y{len(window_order) + facet_idx}"
+            overlay_axis = "y" if facet_idx == 1 else f"y{facet_idx}"
+            layout_yaxis_key = f"yaxis{len(window_order) + facet_idx}"
+            anchor_x = "x" if facet_idx == 1 else f"x{facet_idx}"
+
+            fig.update_layout(
+                {
+                    layout_yaxis_key: dict(
+                        anchor=anchor_x,
+                        overlaying=overlay_axis,
+                        matches=canonical_count_axis,
+                        side="right",
+                        type="log",
+                        minorloglabels="complete",
+                        showgrid=False,
+                        title="Result count" if facet_idx == len(window_order) else "",
+                        showticklabels=facet_idx == len(window_order),
+                        ticks="inside",
+                        showline=facet_idx == len(window_order),
+                    )
+                }
+            )
+
+            for series_name in [LINESTRING_SERIES, cst_series]:
+                series_counts = facet_counts[facet_counts["series"] == series_name].copy()
+                if series_counts.empty:
+                    continue
+                series_counts = series_counts[series_counts["count"] > 0].copy()
+                if series_counts.empty:
+                    continue
+                series_counts["area"] = pd.Categorical(
+                    series_counts["area"], categories=area_order, ordered=True
+                )
+                series_counts = series_counts.sort_values("area")
+                fig.add_trace(
+                    go.Scatter(
+                        x=series_counts["area"].astype(str).tolist(),
+                        y=series_counts["count"].astype(float).tolist(),
+                        mode="lines+markers+text",
+                        name=f"{series_name} count",
+                        legendgroup=f"{series_name}_count",
+                        showlegend=facet_idx == 1,
+                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        textposition="top center",
+                        xaxis=xaxis_ref,
+                        yaxis=yaxis_ref,
+                        line=dict(dash="dot", color=count_color_map[series_name]),
+                        marker=dict(color=count_color_map[series_name]),
+                    )
+                )
+
     output_path = _next_output_path("spatio_temporal_range_facets")
     fig.write_image(output_path)
     print(f"Wrote spatio-temporal facet bar chart to {output_path}")
@@ -550,6 +668,7 @@ def plot_spatial_range_dual_axis(
     selected_traffic: Optional[str] = None,
 ) -> None:
     rows: List[Dict[str, Any]] = []
+    count_rows: List[Dict[str, Any]] = []
     cst_series = _cellstring_series_name(meta)
     area_order = SPATIAL_AREA_ORDER
     effective_threads = (
@@ -578,6 +697,7 @@ def plot_spatial_range_dual_axis(
         result = bench.get("result", {})
         st_exec = result.get("st", {}).get("exec_ms_med")
         cst_exec = result.get("cst", {}).get("exec_ms_med")
+        count_pair = _extract_count_pair(result)
 
         if st_exec is not None:
             rows.append(
@@ -597,6 +717,19 @@ def plot_spatial_range_dual_axis(
                     "series": cst_series,
                     "thread_count": thread_count,
                     "exec_ms": float(cst_exec),
+                }
+            )
+        for series_name, count_value in count_pair.items():
+            normalized_series = (
+                cst_series if series_name == FALLBACK_CELLSTRING_SERIES else series_name
+            )
+            count_rows.append(
+                {
+                    "area": area_label,
+                    "traffic": traffic_class,
+                    "series": normalized_series,
+                    "thread_count": thread_count,
+                    "count": float(count_value),
                 }
             )
 
@@ -707,6 +840,58 @@ def plot_spatial_range_dual_axis(
         fig.update_layout(margin=dict(l=80, r=120, t=25, b=10))
         fig.update_yaxes(type="log")
         fig.update_layout(legend_tracegroupgap=0)
+
+        if count_rows:
+            count_color_map = _count_line_color_map(cst_series)
+            primary_thread = int(thread_order[0]) if thread_order else None
+            counts_df = pd.DataFrame(count_rows)
+            counts_df = counts_df[counts_df["traffic"] == selected_traffic].copy()
+            if primary_thread is not None:
+                counts_df = counts_df[
+                    counts_df["thread_count"].astype(int) == int(primary_thread)
+                ].copy()
+            counts_df = counts_df.sort_values(["area", "series"]).drop_duplicates(
+                subset=["area", "series"], keep="first"
+            )
+            if not counts_df.empty:
+                fig.update_layout(
+                    yaxis2=dict(
+                        title="Result count",
+                        overlaying="y",
+                        side="right",
+                        type="log",
+                        ticks="inside",
+                        showgrid=False,
+                    )
+                )
+                for series_name in [LINESTRING_SERIES, cst_series]:
+                    series_counts = counts_df[counts_df["series"] == series_name].copy()
+                    if series_counts.empty:
+                        continue
+                    series_counts = series_counts[series_counts["count"] > 0].copy()
+                    if series_counts.empty:
+                        continue
+                    series_counts["area"] = pd.Categorical(
+                        series_counts["area"], categories=area_order, ordered=True
+                    )
+                    series_counts = series_counts.sort_values("area")
+                    fig.add_trace(
+                        go.Scatter(
+                            x=series_counts["area"].astype(str).tolist(),
+                            y=series_counts["count"].astype(float).tolist(),
+                            mode="lines+markers+text",
+                            name=f"{series_name} count",
+                            legendgroup=f"{series_name}_count",
+                            text=[
+                                _format_count_text(v)
+                                for v in series_counts["count"].tolist()
+                            ],
+                            textposition="top center",
+                            yaxis="y2",
+                            line=dict(dash="dot", color=count_color_map[series_name]),
+                            marker=dict(color=count_color_map[series_name]),
+                        )
+                    )
 
         output_path = _next_output_path(f"spatial_range_dual_axis_{selected_traffic}")
         fig.write_image(output_path)
@@ -873,6 +1058,54 @@ def plot_spatial_range_dual_axis(
     fig.update_yaxes(type="log")
     fig.update_layout(legend_tracegroupgap=0)
 
+    if count_rows:
+        count_color_map = _count_line_color_map(cst_series)
+        primary_thread = int(thread_order[0]) if thread_order else None
+        counts_df = pd.DataFrame(count_rows)
+        if primary_thread is not None:
+            counts_df = counts_df[
+                counts_df["thread_count"].astype(int) == int(primary_thread)
+            ].copy()
+        counts_df = counts_df.sort_values(["area", "series"]).drop_duplicates(
+            subset=["area", "series"], keep="first"
+        )
+        if not counts_df.empty:
+            fig.update_layout(
+                yaxis2=dict(
+                    title="Result count",
+                    overlaying="y",
+                    side="right",
+                    type="log",
+                    ticks="inside",
+                    showgrid=False,
+                )
+            )
+            for series_name in [LINESTRING_SERIES, cst_series]:
+                series_counts = counts_df[counts_df["series"] == series_name].copy()
+                if series_counts.empty:
+                    continue
+                series_counts = series_counts[series_counts["count"] > 0].copy()
+                if series_counts.empty:
+                    continue
+                series_counts["area"] = pd.Categorical(
+                    series_counts["area"], categories=area_order, ordered=True
+                )
+                series_counts = series_counts.sort_values("area")
+                fig.add_trace(
+                    go.Scatter(
+                        x=series_counts["area"].astype(str).tolist(),
+                        y=series_counts["count"].astype(float).tolist(),
+                        mode="lines+markers+text",
+                        name=f"{series_name} count",
+                        legendgroup=f"{series_name}_count",
+                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        textposition="top center",
+                        yaxis="y2",
+                        line=dict(dash="dot", color=count_color_map[series_name]),
+                        marker=dict(color=count_color_map[series_name]),
+                    )
+                )
+
     output_path = _next_output_path("spatial_range_dual_axis")
     fig.write_image(output_path)
     print(f"Wrote spatial-range dual-axis chart to {output_path}")
@@ -884,6 +1117,7 @@ def plot_temporal_range_grouped(
     selected_threads: Optional[List[int]] = None,
 ) -> None:
     rows: List[Dict[str, Any]] = []
+    count_rows: List[Dict[str, Any]] = []
     cst_series = _cellstring_series_name(meta)
     window_order = ["1 day", "1 week", "1 month"]
     effective_threads = (
@@ -913,6 +1147,7 @@ def plot_temporal_range_grouped(
         result = bench.get("result", {})
         st_exec = result.get("st", {}).get("exec_ms_med")
         cst_exec = result.get("cst", {}).get("exec_ms_med")
+        count_pair = _extract_count_pair(result)
 
         if st_exec is not None:
             rows.append(
@@ -930,6 +1165,18 @@ def plot_temporal_range_grouped(
                     "series": cst_series,
                     "thread_count": thread_count,
                     "exec_ms": float(cst_exec),
+                }
+            )
+        for series_name, count_value in count_pair.items():
+            normalized_series = (
+                cst_series if series_name == FALLBACK_CELLSTRING_SERIES else series_name
+            )
+            count_rows.append(
+                {
+                    "window": window,
+                    "series": normalized_series,
+                    "thread_count": thread_count,
+                    "count": float(count_value),
                 }
             )
 
@@ -1011,6 +1258,54 @@ def plot_temporal_range_grouped(
     _enhance_bar_pattern_visibility(fig)
     fig.update_layout(margin=dict(l=80, r=120, t=25, b=10), legend_tracegroupgap=0)
     fig.update_yaxes(type="log")
+
+    if count_rows:
+        count_color_map = _count_line_color_map(cst_series)
+        primary_thread = int(thread_order[0]) if thread_order else None
+        counts_df = pd.DataFrame(count_rows)
+        if primary_thread is not None:
+            counts_df = counts_df[
+                counts_df["thread_count"].astype(int) == int(primary_thread)
+            ].copy()
+        counts_df = counts_df.sort_values(["window", "series"]).drop_duplicates(
+            subset=["window", "series"], keep="first"
+        )
+        if not counts_df.empty:
+            fig.update_layout(
+                yaxis2=dict(
+                    title="Result count",
+                    overlaying="y",
+                    side="right",
+                    type="log",
+                    ticks="inside",
+                    showgrid=False,
+                )
+            )
+            for series_name in [LINESTRING_SERIES, cst_series]:
+                series_counts = counts_df[counts_df["series"] == series_name].copy()
+                if series_counts.empty:
+                    continue
+                series_counts = series_counts[series_counts["count"] > 0].copy()
+                if series_counts.empty:
+                    continue
+                series_counts["window"] = pd.Categorical(
+                    series_counts["window"], categories=window_order, ordered=True
+                )
+                series_counts = series_counts.sort_values("window")
+                fig.add_trace(
+                    go.Scatter(
+                        x=series_counts["window"].astype(str).tolist(),
+                        y=series_counts["count"].astype(float).tolist(),
+                        mode="lines+markers+text",
+                        name=f"{series_name} count",
+                        legendgroup=f"{series_name}_count",
+                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        textposition="top center",
+                        yaxis="y2",
+                        line=dict(dash="dot", color=count_color_map[series_name]),
+                        marker=dict(color=count_color_map[series_name]),
+                    )
+                )
 
     output_path = _next_output_path("temporal_range_grouped")
     fig.write_image(output_path)

@@ -60,13 +60,13 @@ HAVING COUNT(DISTINCT c.crossing_id) = 3;
 )
 
 
-def build_transit_query_benchmark(
+def build_passage_query_benchmark(
     crossing_id_a: int,
     crossing_id_b: int,
     crossing_id_c: int,
 ) -> TimeBenchmark:
     return TimeBenchmark(
-        name=f"Transit query - crossings {crossing_id_a},{crossing_id_b},{crossing_id_c}",
+        name=f"Passage query - crossings {crossing_id_a},{crossing_id_b},{crossing_id_c}",
         st_sql=ST_SQL,
         cst_sql=CST_SQL,
         st_setup_sql=ST_SETUP_SQL,
@@ -78,6 +78,6 @@ def build_transit_query_benchmark(
     )
 
 
-TRANSIT_QUERY_BENCHMARKS: List[TimeBenchmark] = [
-    build_transit_query_benchmark(7, 11, 14),
+PASSAGE_QUERY_BENCHMARKS: List[TimeBenchmark] = [
+    build_passage_query_benchmark(7, 11, 14),
 ]

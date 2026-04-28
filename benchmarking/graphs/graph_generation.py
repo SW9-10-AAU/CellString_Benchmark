@@ -41,6 +41,10 @@ TEMPORAL_RANGE_NAME_PATTERN = re.compile(
     r"^Temporal range query\s*\((?P<window>[^)]+)\)$",
     re.IGNORECASE,
 )
+PASSAGE_QUERY_NAME_PATTERN = re.compile(
+    r"^Passage query\s*-\s*crossings\s+(?P<crossings>[\d,]+)$",
+    re.IGNORECASE,
+)
 SPATIAL_AREA_GROUPS = {
     1: ("Small", "high"),
     2: ("Medium", "high"),
@@ -618,11 +622,13 @@ def plot_spatio_temporal_range_facets(
                         matches=canonical_count_axis,
                         side="right",
                         type="log",
+                        exponentformat="none",
                         minorloglabels="complete",
                         showgrid=False,
                         title="Result count" if facet_idx == len(window_order) else "",
                         showticklabels=facet_idx == len(window_order),
                         ticks="inside",
+                        ticklabelstandoff=8,
                         showline=facet_idx == len(window_order),
                     )
                 }
@@ -860,7 +866,10 @@ def plot_spatial_range_dual_axis(
                         overlaying="y",
                         side="right",
                         type="log",
+                        exponentformat="none",
+                        minorloglabels="complete",
                         ticks="inside",
+                        ticklabelstandoff=8,
                         showgrid=False,
                     )
                 )
@@ -1076,7 +1085,10 @@ def plot_spatial_range_dual_axis(
                     overlaying="y",
                     side="right",
                     type="log",
+                    exponentformat="none",
+                    minorloglabels="complete",
                     ticks="inside",
+                    ticklabelstandoff=8,
                     showgrid=False,
                 )
             )
@@ -1277,7 +1289,10 @@ def plot_temporal_range_grouped(
                     overlaying="y",
                     side="right",
                     type="log",
+                    exponentformat="none",
+                    minorloglabels="complete",
                     ticks="inside",
+                    ticklabelstandoff=8,
                     showgrid=False,
                 )
             )
@@ -1310,6 +1325,214 @@ def plot_temporal_range_grouped(
     output_path = _next_output_path("temporal_range_grouped")
     fig.write_image(output_path)
     print(f"Wrote temporal-range grouped chart to {output_path}")
+
+
+def plot_passage_query_grouped(
+    benchmarks: List[Dict[str, Any]],
+    meta: Dict[str, Any],
+    selected_threads: Optional[List[int]] = None,
+) -> None:
+    rows: List[Dict[str, Any]] = []
+    count_rows: List[Dict[str, Any]] = []
+    cst_series = _cellstring_series_name(meta)
+    effective_threads = (
+        selected_threads
+        if selected_threads is not None
+        else DEFAULT_SPATIO_TEMPORAL_THREADS
+    )
+    thread_filter = set(effective_threads or [])
+
+    passage_labels_seen: List[str] = []
+    for bench in benchmarks:
+        if bench.get("benchmark_type") != "time":
+            continue
+
+        name = str(bench.get("name") or "")
+        match = PASSAGE_QUERY_NAME_PATTERN.match(name)
+        if not match:
+            continue
+
+        crossings_raw = match.group("crossings").strip()
+        passage_label = crossings_raw
+        if passage_label not in passage_labels_seen:
+            passage_labels_seen.append(passage_label)
+
+        thread_count = int(bench.get("thread_count") or 1)
+        if thread_filter and thread_count not in thread_filter:
+            continue
+
+        result = bench.get("result", {})
+        st_exec = result.get("st", {}).get("exec_ms_med")
+        cst_exec = result.get("cst", {}).get("exec_ms_med")
+        count_pair = _extract_count_pair(result)
+
+        if st_exec is not None:
+            rows.append(
+                {
+                    "passage": passage_label,
+                    "series": LINESTRING_SERIES,
+                    "thread_count": thread_count,
+                    "exec_ms": float(st_exec),
+                }
+            )
+        if cst_exec is not None:
+            rows.append(
+                {
+                    "passage": passage_label,
+                    "series": cst_series,
+                    "thread_count": thread_count,
+                    "exec_ms": float(cst_exec),
+                }
+            )
+        for series_name, count_value in count_pair.items():
+            normalized_series = (
+                cst_series if series_name == FALLBACK_CELLSTRING_SERIES else series_name
+            )
+            count_rows.append(
+                {
+                    "passage": passage_label,
+                    "series": normalized_series,
+                    "thread_count": thread_count,
+                    "count": float(count_value),
+                }
+            )
+
+    if not rows:
+        if thread_filter:
+            print(
+                "Requested thread filters were not found in passage query data; skipping grouped chart."
+            )
+        else:
+            print("No passage query benchmark data found; skipping grouped chart.")
+        return
+
+    passage_order = passage_labels_seen
+
+    df = pd.DataFrame(rows)
+    thread_order = (
+        effective_threads
+        if effective_threads
+        else sorted(int(n) for n in df["thread_count"].dropna().unique().tolist())
+    )
+    thread_order = [t for t in thread_order if t in set(df["thread_count"].tolist())]
+    if not thread_order:
+        print("Requested thread filters were not found in report; skipping chart.")
+        return
+
+    positive_vals = [float(v) for v in df["exec_ms"].tolist() if float(v) > 0.0]
+    if not positive_vals:
+        print("Passage query values are non-positive; cannot render log y-axis chart.")
+        return
+
+    df["passage"] = pd.Categorical(df["passage"], categories=passage_order, ordered=True)
+    base_colors = {
+        LINESTRING_SERIES: LINESTRING_COLOR,
+        cst_series: px.colors.qualitative.Safe[1],
+    }
+    series_order = [LINESTRING_SERIES, cst_series]
+
+    primary_thread_count = thread_order[0] if thread_order else None
+    fig = go.Figure()
+    for idx, thread_count in enumerate(thread_order):
+        for series_idx, series in enumerate(series_order):
+            if not _is_primary_series_thread(series, thread_count, primary_thread_count):
+                continue
+            subset = df[
+                (df["series"] == series) & (df["thread_count"] == thread_count)
+            ].copy()
+            if subset.empty:
+                continue
+
+            subset = subset.sort_values("passage")
+            color = base_colors[series]
+            pattern_shape = THREAD_PATTERN_SEQUENCE[idx % len(THREAD_PATTERN_SEQUENCE)]
+            marker: Dict[str, Any] = {"color": color}
+            if pattern_shape:
+                marker["pattern"] = {"shape": pattern_shape}
+
+            fig.add_trace(
+                go.Bar(
+                    x=subset["passage"].astype(str).tolist(),
+                    y=subset["exec_ms"].astype(float).tolist(),
+                    name=_series_thread_label(series, thread_count),
+                    legendgroup=f"{series}_{thread_count}",
+                    offsetgroup=f"{series}_{thread_count}",
+                    legendrank=10 + (idx * len(series_order)) + series_idx,
+                    marker=marker,
+                    hovertemplate="<b>%{x}</b><br>Execution median: %{y:.2f} ms<extra></extra>",
+                )
+            )
+
+    fig.update_layout(
+        barmode="group",
+        width=1350,
+        height=750,
+        xaxis=dict(
+            categoryorder="array",
+            categoryarray=passage_order,
+            title="Crossings",
+        ),
+        yaxis=dict(title="Execution median (ms)", type="log"),
+    )
+    _apply_transparent_theme(fig, show_grid=True, left_legend=True)
+    _enhance_bar_pattern_visibility(fig)
+    fig.update_layout(margin=dict(l=80, r=120, t=25, b=10), legend_tracegroupgap=0)
+    fig.update_yaxes(type="log")
+
+    if count_rows:
+        count_color_map = _count_line_color_map(cst_series)
+        primary_thread = int(thread_order[0]) if thread_order else None
+        counts_df = pd.DataFrame(count_rows)
+        if primary_thread is not None:
+            counts_df = counts_df[
+                counts_df["thread_count"].astype(int) == int(primary_thread)
+            ].copy()
+        counts_df = counts_df.sort_values(["passage", "series"]).drop_duplicates(
+            subset=["passage", "series"], keep="first"
+        )
+        if not counts_df.empty:
+            fig.update_layout(
+                yaxis2=dict(
+                    title="Result count",
+                    overlaying="y",
+                    side="right",
+                    type="log",
+                    exponentformat="none",
+                    minorloglabels="complete",
+                    ticks="inside",
+                    ticklabelstandoff=8,
+                    showgrid=False,
+                )
+            )
+            for series_name in [LINESTRING_SERIES, cst_series]:
+                series_counts = counts_df[counts_df["series"] == series_name].copy()
+                if series_counts.empty:
+                    continue
+                series_counts = series_counts[series_counts["count"] > 0].copy()
+                if series_counts.empty:
+                    continue
+                series_counts["passage"] = pd.Categorical(
+                    series_counts["passage"], categories=passage_order, ordered=True
+                )
+                series_counts = series_counts.sort_values("passage")
+                fig.add_trace(
+                    go.Scatter(
+                        x=series_counts["passage"].astype(str).tolist(),
+                        y=series_counts["count"].astype(float).tolist(),
+                        mode="lines+markers+text",
+                        name=f"{series_name} count",
+                        legendgroup=f"{series_name}_count",
+                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        textposition="top center",
+                        yaxis="y2",
+                        line=dict(dash="dot", color=count_color_map[series_name]),
+                        marker=dict(color=count_color_map[series_name]),
+                    )
+                )
+
+    output_path = _next_output_path("passage_query_grouped")
+    fig.write_image(output_path)
+    print(f"Wrote passage-query grouped chart to {output_path}")
 
 
 def plot_false_match_counts(benchmarks: List[Dict[str, Any]]) -> None:
@@ -1579,6 +1802,13 @@ def run_all_graphs(
 
     if wants("temporal_range_grouped"):
         plot_temporal_range_grouped(
+            benchmarks,
+            data.get("meta", {}),
+            selected_threads=selected_threads,
+        )
+
+    if wants("passage_query_grouped"):
+        plot_passage_query_grouped(
             benchmarks,
             data.get("meta", {}),
             selected_threads=selected_threads,

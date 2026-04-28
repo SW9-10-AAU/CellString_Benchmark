@@ -32,7 +32,7 @@ def load_ids() -> Tuple[Dict, List[int]]:
         result = bench.get("result", {})
         ids.update(_collect_samples(result.get("st")))
         ids.update(_collect_samples(result.get("cst")))
-        for area_runs in result.get("per_area_results", {}).values():
+        for area_runs in result.get("per_region_results", {}).values():
             if not isinstance(area_runs, dict):
                 continue
             for run in area_runs.values():
@@ -80,4 +80,6 @@ if __name__ == "__main__":
         conn.close()
     embed(data, cardinalities)
     JSON_PATH.write_text(json.dumps(data, indent=2))
-    print(f"Updated {JSON_PATH} with trajectory cardinalities for {len(ids)} trajectories.")
+    print(
+        f"Updated {JSON_PATH} with trajectory cardinalities for {len(ids)} trajectories."
+    )

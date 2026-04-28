@@ -1,5 +1,10 @@
 from benchmarking.core import TimeBenchmark
-from benchmarking.table_config import CROSSING_CS_TABLE, CROSSING_LS_TABLE, TRAJECTORY_CS_TABLE, TRAJECTORY_LS_TABLE
+from benchmarking.table_config import (
+    PASSAGE_CS_TABLE,
+    PASSAGE_LS_TABLE,
+    TRAJECTORY_CS_TABLE,
+    TRAJECTORY_LS_TABLE,
+)
 
 ST_SQL = """
 SELECT
@@ -19,7 +24,7 @@ WHERE crossingA.crossing_id = ?
 
 ST_SQL = ST_SQL.format(
     trajectory_ls_table=TRAJECTORY_LS_TABLE,
-    crossing_ls_table=CROSSING_LS_TABLE,
+    crossing_ls_table=PASSAGE_LS_TABLE,
 )
 
 CST_SQL = """
@@ -49,7 +54,7 @@ WHERE EXISTS (
 
 CST_SQL = CST_SQL.format(
     trajectory_cs_table=TRAJECTORY_CS_TABLE,
-    crossing_cs_table=CROSSING_CS_TABLE,
+    crossing_cs_table=PASSAGE_CS_TABLE,
 )
 
 
@@ -65,5 +70,5 @@ def build_via_benchmark(label: str, crossings: tuple[int, int, int]) -> TimeBenc
 
 CROSSING_VIA_BENCHMARKS = [
     build_via_benchmark("Skagen-Storebælt-Bornholm", (1, 2, 4)),
-    build_via_benchmark("Skagen-Kattegat-Storebælt", (1, 6, 2))
+    build_via_benchmark("Skagen-Kattegat-Storebælt", (1, 6, 2)),
 ]

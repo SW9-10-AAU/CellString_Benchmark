@@ -30,11 +30,11 @@ AREA_SIZE_LABELS = {
     3: "L",
 }
 SPATIO_TEMPORAL_NAME_PATTERN = re.compile(
-    r"^Spatio-temporal range query - area\s+(?P<area_id>\d+)\s+\((?P<window>[^)]+)\)$",
+    r"^Spatio-temporal range query - area\s+(?P<region_id>\d+)\s+\((?P<window>[^)]+)\)$",
     re.IGNORECASE,
 )
 SPATIAL_RANGE_NAME_PATTERN = re.compile(
-    r"^Spatial range query - area\s+(?P<area_id>\d+)$",
+    r"^Spatial range query - area\s+(?P<region_id>\d+)$",
     re.IGNORECASE,
 )
 TEMPORAL_RANGE_NAME_PATTERN = re.compile(
@@ -440,7 +440,7 @@ def plot_spatio_temporal_range_facets(
         if not match:
             continue
 
-        area_id = int(match.group("area_id"))
+        area_id = int(match.group("region_id"))
         area_traffic = _traffic_for_area_id(area_id)
         if selected_traffic in {"low", "high"} and area_traffic != selected_traffic:
             continue
@@ -597,7 +597,9 @@ def plot_spatio_temporal_range_facets(
         count_color_map = _count_line_color_map(cst_series)
         primary_thread = int(thread_count_order[0])
         counts_df = pd.DataFrame(count_rows)
-        counts_df = counts_df[counts_df["thread_count"].astype(int) == primary_thread].copy()
+        counts_df = counts_df[
+            counts_df["thread_count"].astype(int) == primary_thread
+        ].copy()
         counts_df = counts_df.sort_values(["window", "area", "series"]).drop_duplicates(
             subset=["window", "area", "series"], keep="first"
         )
@@ -635,7 +637,9 @@ def plot_spatio_temporal_range_facets(
             )
 
             for series_name in [LINESTRING_SERIES, cst_series]:
-                series_counts = facet_counts[facet_counts["series"] == series_name].copy()
+                series_counts = facet_counts[
+                    facet_counts["series"] == series_name
+                ].copy()
                 if series_counts.empty:
                     continue
                 series_counts = series_counts[series_counts["count"] > 0].copy()
@@ -653,7 +657,10 @@ def plot_spatio_temporal_range_facets(
                         name=f"{series_name} count",
                         legendgroup=f"{series_name}_count",
                         showlegend=facet_idx == 1,
-                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        text=[
+                            _format_count_text(v)
+                            for v in series_counts["count"].tolist()
+                        ],
                         textposition="top center",
                         xaxis=xaxis_ref,
                         yaxis=yaxis_ref,
@@ -690,7 +697,7 @@ def plot_spatial_range_dual_axis(
         if not match:
             continue
 
-        area_id = int(match.group("area_id"))
+        area_id = int(match.group("region_id"))
         area_info = SPATIAL_AREA_GROUPS.get(area_id)
         if area_info is None:
             continue
@@ -991,7 +998,9 @@ def plot_spatial_range_dual_axis(
     primary_thread_count = thread_order[0] if thread_order else None
     for idx, thread_count in enumerate(thread_order):
         for series_idx, series in enumerate(series_order):
-            if not _is_primary_series_thread(series, thread_count, primary_thread_count):
+            if not _is_primary_series_thread(
+                series, thread_count, primary_thread_count
+            ):
                 continue
             subset = pivot[
                 (pivot["series"] == series) & (pivot["thread_count"] == thread_count)
@@ -1110,7 +1119,10 @@ def plot_spatial_range_dual_axis(
                         mode="lines+markers+text",
                         name=f"{series_name} count",
                         legendgroup=f"{series_name}_count",
-                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        text=[
+                            _format_count_text(v)
+                            for v in series_counts["count"].tolist()
+                        ],
                         textposition="top center",
                         yaxis="y2",
                         line=dict(dash="dot", color=count_color_map[series_name]),
@@ -1228,7 +1240,9 @@ def plot_temporal_range_grouped(
     fig = go.Figure()
     for idx, thread_count in enumerate(thread_order):
         for series_idx, series in enumerate(series_order):
-            if not _is_primary_series_thread(series, thread_count, primary_thread_count):
+            if not _is_primary_series_thread(
+                series, thread_count, primary_thread_count
+            ):
                 continue
             subset = df[
                 (df["series"] == series) & (df["thread_count"] == thread_count)
@@ -1314,7 +1328,10 @@ def plot_temporal_range_grouped(
                         mode="lines+markers+text",
                         name=f"{series_name} count",
                         legendgroup=f"{series_name}_count",
-                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        text=[
+                            _format_count_text(v)
+                            for v in series_counts["count"].tolist()
+                        ],
                         textposition="top center",
                         yaxis="y2",
                         line=dict(dash="dot", color=count_color_map[series_name]),
@@ -1424,7 +1441,9 @@ def plot_passage_query_grouped(
         print("Passage query values are non-positive; cannot render log y-axis chart.")
         return
 
-    df["passage"] = pd.Categorical(df["passage"], categories=passage_order, ordered=True)
+    df["passage"] = pd.Categorical(
+        df["passage"], categories=passage_order, ordered=True
+    )
     base_colors = {
         LINESTRING_SERIES: LINESTRING_COLOR,
         cst_series: px.colors.qualitative.Safe[1],
@@ -1435,7 +1454,9 @@ def plot_passage_query_grouped(
     fig = go.Figure()
     for idx, thread_count in enumerate(thread_order):
         for series_idx, series in enumerate(series_order):
-            if not _is_primary_series_thread(series, thread_count, primary_thread_count):
+            if not _is_primary_series_thread(
+                series, thread_count, primary_thread_count
+            ):
                 continue
             subset = df[
                 (df["series"] == series) & (df["thread_count"] == thread_count)
@@ -1522,7 +1543,10 @@ def plot_passage_query_grouped(
                         mode="lines+markers+text",
                         name=f"{series_name} count",
                         legendgroup=f"{series_name}_count",
-                        text=[_format_count_text(v) for v in series_counts["count"].tolist()],
+                        text=[
+                            _format_count_text(v)
+                            for v in series_counts["count"].tolist()
+                        ],
                         textposition="top center",
                         yaxis="y2",
                         line=dict(dash="dot", color=count_color_map[series_name]),
@@ -1706,14 +1730,14 @@ def plot_area_mmsi_coverage(benchmarks: List[Dict[str, Any]], top_k: int = 3) ->
         if "MMSI Coverage" not in bench.get("name", ""):
             continue
         for row in bench.get("result", {}).get("rows", []):
-            area_id = row.get("area_id")
+            area_id = row.get("region_id")
             mmsi = row.get("mmsi")
             coverage = row.get("coverage_percent")
             if area_id is None or mmsi is None or coverage is None:
                 continue
             area_to_rows.setdefault(str(area_id), []).append(
                 {
-                    "area_id": str(area_id),
+                    "region_id": str(area_id),
                     "mmsi": str(mmsi),
                     "coverage_percent": float(coverage),
                 }

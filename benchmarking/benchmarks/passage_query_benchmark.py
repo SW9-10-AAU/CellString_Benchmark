@@ -4,8 +4,8 @@ from typing import List
 
 from benchmarking.core import TimeBenchmark
 from benchmarking.table_config import (
-    CROSSING_CS_TABLE,
-    CROSSING_LS_TABLE,
+    PASSAGE_CS_TABLE,
+    PASSAGE_LS_TABLE,
     TRAJECTORY_CS_TABLE,
     TRAJECTORY_LS_TABLE,
 )
@@ -32,7 +32,7 @@ WHERE crossingA.name = getvariable('crossing_name_a')
   AND ST_Intersects(traj.geom, crossingC.geom);
 """.format(
     trajectory_ls_table=TRAJECTORY_LS_TABLE,
-    crossing_ls_table=CROSSING_LS_TABLE,
+    crossing_ls_table=PASSAGE_LS_TABLE,
 )
 
 CST_SETUP_SQL = """
@@ -56,7 +56,7 @@ GROUP BY t.trajectory_id, t.mmsi
 HAVING COUNT(DISTINCT c.name) = 3;
 """.format(
     trajectory_cs_table=TRAJECTORY_CS_TABLE,
-    crossing_cs_table=CROSSING_CS_TABLE,
+    crossing_cs_table=PASSAGE_CS_TABLE,
 )
 
 

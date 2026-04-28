@@ -25,27 +25,22 @@ def _window(start: datetime, days: int) -> tuple[str, str]:
 
 
 ST_SETUP_SQL = """
-SET VARIABLE t_start = CAST(? AS TIMESTAMP);
-SET VARIABLE t_end = CAST(? AS TIMESTAMP);
+SET VARIABLE ts_period_start = CAST(? AS TIMESTAMP);
+SET VARIABLE ts_period_end = CAST(? AS TIMESTAMP);
 """
-
-
-CST_SETUP_SQL = """
-SET VARIABLE t_start = CAST(? AS TIMESTAMP);
-SET VARIABLE t_end = CAST(? AS TIMESTAMP);
-"""
-
 
 ST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_ls_table} AS t
-WHERE t.ts_start <= getvariable('t_end')
-  AND t.ts_end >= getvariable('t_start')
+WHERE t.ts_start <= getvariable('ts_period_end')
+  AND t.ts_end >= getvariable('ts_period_start'
+    
 UNION ALL
+    
 SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS source
 FROM {stop_poly_table} AS s
-WHERE s.ts_start <= getvariable('t_end')
-  AND s.ts_end >= getvariable('t_start');
+WHERE s.ts_start <= getvariable('ts_period_end')
+  AND s.ts_end >= getvariable('ts_period_start');
 """
 
 ST_SQL = ST_SQL.format(
@@ -53,17 +48,24 @@ ST_SQL = ST_SQL.format(
     stop_poly_table=STOP_POLY_TABLE,
 )
 
+
+CST_SETUP_SQL = """
+SET VARIABLE ts_period_start = CAST(? AS TIMESTAMP);
+SET VARIABLE ts_period_end = CAST(? AS TIMESTAMP);
+"""
+
 CST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_cs_table} AS t
-WHERE t.ts BETWEEN getvariable('t_start') AND getvariable('t_end')
+WHERE t.ts <= getvariable('ts_period_end')
+  AND t.ts + (INTERVAL (t.delta_sec) SECOND) >= getvariable('ts_period_start')
 
 UNION ALL
 
 SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS source
 FROM {stop_cs_table} AS s
-WHERE s.ts_start <= getvariable('t_end')
-  AND s.ts_end >= getvariable('t_start');
+WHERE s.ts_start <= getvariable('ts_period_end')
+  AND s.ts_end >= getvariable('ts_period_start');
 """
 
 CST_SQL = CST_SQL.format(

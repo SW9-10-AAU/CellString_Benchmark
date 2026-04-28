@@ -22,8 +22,8 @@ class TimeBenchmark:
     repeats: int = 5
     with_trajectory_ids: bool = False
     with_stop_ids: bool = False
-    area_ids: List[int] = field(default_factory=list)
-    use_area_ids: bool = False
+    region_ids: List[int] = field(default_factory=list)
+    use_region_ids: bool = False
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ class TimeBenchmarkResult:
     cst: RunOutcome
     false_positives: int
     false_negatives: int
-    per_area_results: Dict[int, Dict[str, RunOutcome]] = field(default_factory=dict)
+    per_region_results: Dict[int, Dict[str, RunOutcome]] = field(default_factory=dict)
     result_counts: Dict[str, int] = field(default_factory=dict)
 
 
@@ -286,7 +286,9 @@ def _execute_random_or_repeated_queries(
             exec_times.append(exec_ms)
 
     _reset_connection(cur)
-    return RunOutcome(_median_or_zero(exec_times), collected_rows, samples=sample_records)
+    return RunOutcome(
+        _median_or_zero(exec_times), collected_rows, samples=sample_records
+    )
 
 
 def run_time_benchmark(
@@ -295,39 +297,39 @@ def run_time_benchmark(
     trajectory_ids: List[int] | None = None,
     stop_ids: List[int] | None = None,
 ) -> TimeBenchmarkResult:
-    per_area_results: Dict[int, Dict[str, RunOutcome]] = {}
+    per_region_results: Dict[int, Dict[str, RunOutcome]] = {}
 
     cur = connection.cursor()
     try:
-        if benchmark.use_area_ids and benchmark.area_ids:
+        if benchmark.use_region_ids and benchmark.region_ids:
             st_rows: List[Tuple] = []
             valid_st_runs: List[RunOutcome] = []
             cst_rows: List[Tuple] = []
             valid_cst_runs: List[RunOutcome] = []
 
-            for area_id in benchmark.area_ids:
-                area_params = (area_id,) + benchmark.params
+            for region_id in benchmark.region_ids:
+                region_params = (region_id,) + benchmark.params
                 st_run = _execute_random_or_repeated_queries(
                     cur,
                     benchmark.st_sql,
-                    area_params,
+                    region_params,
                     repeats=benchmark.repeats,
                     setup_sql=benchmark.st_setup_sql,
                     setup_params=benchmark.st_setup_params,
                 )
-                per_area_results[area_id] = {"st": st_run}
+                per_region_results[region_id] = {"st": st_run}
                 st_rows.extend(st_run.rows)
                 valid_st_runs.append(st_run)
 
                 cst_run = _execute_random_or_repeated_queries(
                     cur,
                     benchmark.cst_sql,
-                    area_params,
+                    region_params,
                     repeats=benchmark.repeats,
                     setup_sql=benchmark.cst_setup_sql,
                     setup_params=benchmark.cst_setup_params,
                 )
-                per_area_results[area_id]["cst"] = cst_run
+                per_region_results[region_id]["cst"] = cst_run
                 cst_rows.extend(cst_run.rows)
                 valid_cst_runs.append(cst_run)
 
@@ -406,7 +408,7 @@ def run_time_benchmark(
         cst_out,
         false_positives,
         false_negatives,
-        per_area_results,
+        per_region_results,
         result_counts,
     )
 
@@ -493,11 +495,11 @@ def print_time_result(result: TimeBenchmarkResult) -> None:
     print(f"False positives (CellString \\ LineString): {result.false_positives}")
     print(f"False negatives (LineString \\ CellString): {result.false_negatives}")
     print("----------------------------")
-    if result.per_area_results:
-        print("Per-area breakdown:")
-        for area_id in sorted(result.per_area_results):
-            print(f"Area {area_id}:")
-            for label, run in result.per_area_results[area_id].items():
+    if result.per_region_results:
+        print("Per-region breakdown:")
+        for region_id in sorted(result.per_region_results):
+            print(f"Region {region_id}:")
+            for label, run in result.per_region_results[region_id].items():
                 _print_run(f"  {label}", run)
             print("----------------------------")
 

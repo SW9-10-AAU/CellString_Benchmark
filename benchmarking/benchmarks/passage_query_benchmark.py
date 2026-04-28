@@ -82,5 +82,10 @@ def build_passage_query_benchmark(
 
 
 PASSAGE_QUERY_BENCHMARKS: List[TimeBenchmark] = [
+    # The Great Belt
     build_passage_query_benchmark("Skagen", "Storebælt Syd", "Bornholms Gate"),
+    # The Sound
+    build_passage_query_benchmark("Skagen", "Sundet Syd", "Bornholms Gate"),
+    # The Kieler Canal
+    build_passage_query_benchmark("Kiel", "Kadetrenden", "Bornholms Gate"),
 ]

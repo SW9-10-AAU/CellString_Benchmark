@@ -546,22 +546,21 @@ def _execute_cold_hot_single(
 ) -> tuple[ColdHotOutcome, List[Tuple]]:
     """Run a query *tries* times, returning cold/hot timings.
 
-    Run 1 is preceded by an OS page-cache clear and a fresh DB connection
-    (cold run).  The hot time is the minimum of runs 2 .. *tries*.
+    Run 1 is preceded by an OS page-cache clear (cold run).
+    The connection is kept open so runs 2 .. *tries* benefit from DuckDB's
+    internal buffer pool (hot run).
     """
     all_times: List[float] = []
     result_rows: List[Tuple] = []
 
-    for i in range(tries):
-        if i == 0:
-            _clear_os_page_cache()
-
-        # Open a fresh connection for each run so DuckDB's buffer pool
-        # doesn't carry over pages from the previous run.
-        conn = conn_factory()
+    conn = conn_factory()
+    try:
+        cur = conn.cursor()
         try:
-            cur = conn.cursor()
-            try:
+            for i in range(tries):
+                if i == 0:
+                    _clear_os_page_cache()
+
                 rows, exec_ms = _execute_with_timing(
                     cur,
                     sql,
@@ -572,10 +571,10 @@ def _execute_cold_hot_single(
                 all_times.append(exec_ms)
                 if i == 0:
                     result_rows = rows
-            finally:
-                cur.close()
         finally:
-            conn.close()
+            cur.close()
+    finally:
+        conn.close()
 
     cold_ms = all_times[0]
     hot_ms = min(all_times[1:]) if len(all_times) > 1 else cold_ms

@@ -15,7 +15,7 @@ def connect_to_db(config: DuckDBConfig | None = None) -> duckdb.DuckDBPyConnecti
     threads = int(os.getenv("DUCKDB_THREADS", "1"))
     resolved = config or DuckDBConfig(db_path=db_path, threads=threads)
 
-    conn = duckdb.connect(resolved.db_path)
+    conn = duckdb.connect(resolved.db_path, read_only=True)
     conn.execute(f"PRAGMA threads={max(1, resolved.threads)}")
     conn.execute("PRAGMA enable_progress_bar=false")
 

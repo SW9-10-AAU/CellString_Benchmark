@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import platform
+import subprocess
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -52,6 +54,21 @@ class TimeBenchmarkResult:
     false_positives: int
     false_negatives: int
     per_area_results: Dict[int, Dict[str, RunOutcome]] = field(default_factory=dict)
+    result_counts: Dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ColdHotOutcome:
+    cold_ms: float
+    hot_ms: float
+    all_runs_ms: List[float]
+
+
+@dataclass
+class ColdHotBenchmarkResult:
+    name: str
+    st: ColdHotOutcome
+    cst: ColdHotOutcome
     result_counts: Dict[str, int] = field(default_factory=dict)
 
 
@@ -489,4 +506,141 @@ def print_value_result(result: ValueBenchmarkResult) -> None:
     print(f"\n--- {result.name} ---")
     for label, value in result.median_values.items():
         print(f"{label}: median value = {value:.10f}")
+    print("----------------------------")
+
+
+def _clear_os_page_cache() -> None:
+    """Clear the Linux filesystem page cache.
+
+    Equivalent to:
+        sync
+        echo 3 | sudo tee /proc/sys/vm/drop_caches
+    """
+    system = platform.system()
+    if system != "Linux":
+        print(
+            f"WARNING: OS page cache clearing is only supported on Linux "
+            f"(detected {system}). Skipping cache clear."
+        )
+        return
+
+    print("Clearing filesystem page cache...")
+    subprocess.run(["sync"], check=True)
+    subprocess.run(
+        ["sudo", "tee", "/proc/sys/vm/drop_caches"],
+        input=b"3",
+        stdout=subprocess.DEVNULL,
+        check=True,
+    )
+    print("Filesystem page cache cleared.")
+
+
+def _execute_cold_hot_single(
+    conn_factory,
+    sql: str,
+    params: Sequence[Any],
+    *,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
+    tries: int = 3,
+) -> tuple[ColdHotOutcome, List[Tuple]]:
+    """Run a query *tries* times, returning cold/hot timings.
+
+    Run 1 is preceded by an OS page-cache clear and a fresh DB connection
+    (cold run).  The hot time is the minimum of runs 2 .. *tries*.
+    """
+    all_times: List[float] = []
+    result_rows: List[Tuple] = []
+
+    for i in range(tries):
+        if i == 0:
+            _clear_os_page_cache()
+
+        # Open a fresh connection for each run so DuckDB's buffer pool
+        # doesn't carry over pages from the previous run.
+        conn = conn_factory()
+        try:
+            cur = conn.cursor()
+            try:
+                rows, exec_ms = _execute_with_timing(
+                    cur,
+                    sql,
+                    params,
+                    setup_sql=setup_sql,
+                    setup_params=setup_params,
+                )
+                all_times.append(exec_ms)
+                if i == 0:
+                    result_rows = rows
+            finally:
+                cur.close()
+        finally:
+            conn.close()
+
+    cold_ms = all_times[0]
+    hot_ms = min(all_times[1:]) if len(all_times) > 1 else cold_ms
+
+    outcome = ColdHotOutcome(
+        cold_ms=round(cold_ms, 3),
+        hot_ms=round(hot_ms, 3),
+        all_runs_ms=[round(t, 3) for t in all_times],
+    )
+    return outcome, result_rows
+
+
+def run_cold_hot_benchmark(
+    conn_factory,
+    benchmark: TimeBenchmark,
+) -> ColdHotBenchmarkResult:
+    """Execute a TimeBenchmark using the cold/hot methodology.
+
+    *conn_factory* is a zero-argument callable that returns a new, ready-to-use
+    DuckDB connection (with spatial loaded, threads set, etc.).
+    """
+    print(f"  [LineString] cold/hot ...")
+    st_outcome, st_rows = _execute_cold_hot_single(
+        conn_factory,
+        benchmark.st_sql,
+        benchmark.params,
+        setup_sql=benchmark.st_setup_sql,
+        setup_params=benchmark.st_setup_params,
+    )
+
+    print(f"  [CellString] cold/hot ...")
+    cst_outcome, cst_rows = _execute_cold_hot_single(
+        conn_factory,
+        benchmark.cst_sql,
+        benchmark.params,
+        setup_sql=benchmark.cst_setup_sql,
+        setup_params=benchmark.cst_setup_params,
+    )
+
+    st_keys = _keyset(st_rows)
+    cst_keys = _keyset(cst_rows)
+    result_counts: Dict[str, int] = {
+        "LineString": len(st_keys),
+        "CellString": len(cst_keys),
+    }
+
+    return ColdHotBenchmarkResult(
+        name=benchmark.name,
+        st=st_outcome,
+        cst=cst_outcome,
+        result_counts=result_counts,
+    )
+
+
+def print_cold_hot_result(result: ColdHotBenchmarkResult) -> None:
+    print(f"\n--- {result.name} (cold/hot) ---")
+    print(
+        f"  LineString:  cold={result.st.cold_ms:.1f}ms  "
+        f"hot={result.st.hot_ms:.1f}ms  "
+        f"all={result.st.all_runs_ms}"
+    )
+    print(
+        f"  CellString:  cold={result.cst.cold_ms:.1f}ms  "
+        f"hot={result.cst.hot_ms:.1f}ms  "
+        f"all={result.cst.all_runs_ms}"
+    )
+    print(f"  Result counts: {result.result_counts}")
     print("----------------------------")

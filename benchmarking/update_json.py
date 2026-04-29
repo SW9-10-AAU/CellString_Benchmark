@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 from benchmarking.connect import connect_to_db
 from benchmarking.table_config import TRAJECTORY_CS_TABLE
 
-JSON_PATH = Path("benchmarking/benchmark_results/run_20251209_095304.json")
+JSON_PATH = Path(
+    "/home/ubuntu/duckdb_python/CellString_Benchmark/benchmarking/benchmark_results/run_20260429_115411.json"
+)
 TABLE = TRAJECTORY_CS_TABLE
 
 

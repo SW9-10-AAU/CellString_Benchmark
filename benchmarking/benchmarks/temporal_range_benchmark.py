@@ -33,7 +33,7 @@ ST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_ls_table} AS t
 WHERE t.ts_start <= getvariable('ts_period_end')
-  AND t.ts_end >= getvariable('ts_period_start'
+  AND t.ts_end >= getvariable('ts_period_start')
     
 UNION ALL
     

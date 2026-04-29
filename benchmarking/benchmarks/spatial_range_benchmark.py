@@ -10,8 +10,13 @@ from benchmarking.table_config import (
 
 ST_SETUP_SQL = """
 SET VARIABLE region_id = ?;
-SET VARIABLE query_region = (SELECT geom FROM {region_poly_table} WHERE region_id = getvariable('region_id'));
+SET VARIABLE query_region = (
+    SELECT geom
+    FROM {region_poly_table}
+    WHERE region_id = getvariable('region_id'));
 """
+
+ST_SETUP_SQL = ST_SETUP_SQL.format(region_poly_table=REGION_POLY_TABLE)
 
 ST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source

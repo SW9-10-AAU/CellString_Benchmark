@@ -1,0 +1,360 @@
+{
+  "meta": {
+    "run_started_at": "2026-04-28T09:46:36.723921+00:00",
+    "run_label": "server",
+    "benchmark_type": "cold_hot",
+    "db_backend": "duckdb",
+    "duckdb_path": "/home/ubuntu/duckdb_data/cellstring.duckdb",
+    "linestring_schema": "p10",
+    "cellstring_schema": "db_design1_v3",
+    "thread_plan": [
+      12,
+      40,
+      120
+    ]
+  },
+  "benchmarks": [
+    {
+      "name": "Spatio-temporal range query - area 3 (1 day)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "cold_ms": 138026.749,
+          "hot_ms": 4832.271,
+          "all_runs_ms": [
+            138026.749,
+            4832.271,
+            4855.85
+          ]
+        },
+        "cst": {
+          "cold_ms": 21187.441,
+          "hot_ms": 1264.308,
+          "all_runs_ms": [
+            21187.441,
+            1866.197,
+            1264.308
+          ]
+        },
+        "result_counts": {
+          "LineString": 175,
+          "CellString": 109
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 week)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "cold_ms": 140266.859,
+          "hot_ms": 5004.945,
+          "all_runs_ms": [
+            140266.859,
+            5013.417,
+            5004.945
+          ]
+        },
+        "cst": {
+          "cold_ms": 63488.291,
+          "hot_ms": 2854.439,
+          "all_runs_ms": [
+            63488.291,
+            4921.567,
+            2854.439
+          ]
+        },
+        "result_counts": {
+          "LineString": 710,
+          "CellString": 654
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 month)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 12,
+      "result": {
+        "st": {
+          "cold_ms": 138086.532,
+          "hot_ms": 5388.923,
+          "all_runs_ms": [
+            138086.532,
+            5388.923,
+            6014.42
+          ]
+        },
+        "cst": {
+          "cold_ms": 94015.557,
+          "hot_ms": 4082.395,
+          "all_runs_ms": [
+            94015.557,
+            4424.29,
+            4082.395
+          ]
+        },
+        "result_counts": {
+          "LineString": 1774,
+          "CellString": 1764
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 day)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 40,
+      "result": {
+        "st": {
+          "cold_ms": 139041.411,
+          "hot_ms": 4352.661,
+          "all_runs_ms": [
+            139041.411,
+            4352.661,
+            4807.528
+          ]
+        },
+        "cst": {
+          "cold_ms": 9831.359,
+          "hot_ms": 822.047,
+          "all_runs_ms": [
+            9831.359,
+            1105.666,
+            822.047
+          ]
+        },
+        "result_counts": {
+          "LineString": 175,
+          "CellString": 109
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 week)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 40,
+      "result": {
+        "st": {
+          "cold_ms": 132781.953,
+          "hot_ms": 5032.468,
+          "all_runs_ms": [
+            132781.953,
+            5101.1,
+            5032.468
+          ]
+        },
+        "cst": {
+          "cold_ms": 25873.975,
+          "hot_ms": 2057.15,
+          "all_runs_ms": [
+            25873.975,
+            2328.715,
+            2057.15
+          ]
+        },
+        "result_counts": {
+          "LineString": 710,
+          "CellString": 654
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 month)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 40,
+      "result": {
+        "st": {
+          "cold_ms": 130114.65,
+          "hot_ms": 5953.038,
+          "all_runs_ms": [
+            130114.65,
+            6002.99,
+            5953.038
+          ]
+        },
+        "cst": {
+          "cold_ms": 40235.03,
+          "hot_ms": 3226.686,
+          "all_runs_ms": [
+            40235.03,
+            3399.254,
+            3226.686
+          ]
+        },
+        "result_counts": {
+          "LineString": 1774,
+          "CellString": 1764
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 day)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 120,
+      "result": {
+        "st": {
+          "cold_ms": 134867.688,
+          "hot_ms": 4862.518,
+          "all_runs_ms": [
+            134867.688,
+            4862.518,
+            4906.874
+          ]
+        },
+        "cst": {
+          "cold_ms": 4686.493,
+          "hot_ms": 523.721,
+          "all_runs_ms": [
+            4686.493,
+            884.171,
+            523.721
+          ]
+        },
+        "result_counts": {
+          "LineString": 175,
+          "CellString": 109
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 week)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 120,
+      "result": {
+        "st": {
+          "cold_ms": 135587.332,
+          "hot_ms": 4990.248,
+          "all_runs_ms": [
+            135587.332,
+            5163.174,
+            4990.248
+          ]
+        },
+        "cst": {
+          "cold_ms": 12379.183,
+          "hot_ms": 1047.962,
+          "all_runs_ms": [
+            12379.183,
+            1156.192,
+            1047.962
+          ]
+        },
+        "result_counts": {
+          "LineString": 710,
+          "CellString": 654
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - area 3 (1 month)",
+      "benchmark_type": "cold_hot",
+      "tables_used": [
+        "db_design1_v3.area_cs",
+        "db_design1_v3.stop_cs",
+        "db_design1_v3.trajectory_cs",
+        "p10.area_poly",
+        "p10.stop_poly",
+        "p10.trajectory_ls",
+        "selected_area"
+      ],
+      "thread_count": 120,
+      "result": {
+        "st": {
+          "cold_ms": 132575.037,
+          "hot_ms": 5389.202,
+          "all_runs_ms": [
+            132575.037,
+            5389.202,
+            6040.811
+          ]
+        },
+        "cst": {
+          "cold_ms": 26569.846,
+          "hot_ms": 1924.684,
+          "all_runs_ms": [
+            26569.846,
+            2090.002,
+            1924.684
+          ]
+        },
+        "result_counts": {
+          "LineString": 1774,
+          "CellString": 1764
+        }
+      }
+    }
+  ]
+}

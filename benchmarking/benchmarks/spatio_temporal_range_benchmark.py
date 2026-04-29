@@ -38,12 +38,6 @@ SET VARIABLE query_region = (
 
 ST_SETUP_SQL = ST_SETUP_SQL.format(region_poly_table=REGION_POLY_TABLE)
 
-ST_SQL = ST_SQL.format(
-    region_poly_table=REGION_POLY_TABLE,
-    trajectory_ls_table=TRAJECTORY_LS_TABLE,
-    stop_poly_table=STOP_POLY_TABLE,
-)
-
 ST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_ls_table} AS t
@@ -58,6 +52,11 @@ WHERE ST_Intersects(s.geom, getvariable('query_region'))
 AND s.ts_start <= getvariable('ts_period_end') AND s.ts_end >= getvariable('ts_period_start');
 """
 
+ST_SQL = ST_SQL.format(
+    region_poly_table=REGION_POLY_TABLE,
+    trajectory_ls_table=TRAJECTORY_LS_TABLE,
+    stop_poly_table=STOP_POLY_TABLE,
+)
 
 CST_SETUP_SQL = """
 SET VARIABLE ts_period_start = CAST(? AS TIMESTAMP);

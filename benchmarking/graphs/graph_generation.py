@@ -42,9 +42,14 @@ TEMPORAL_RANGE_NAME_PATTERN = re.compile(
     re.IGNORECASE,
 )
 PASSAGE_QUERY_NAME_PATTERN = re.compile(
-    r"^Passage query\s*-\s*crossings\s+(?P<crossings>[\d,]+)$",
+    r"^Passage query\s*-\s*crossings\s+(?P<crossings>.+)$",
     re.IGNORECASE,
 )
+PASSAGE_LABEL_OVERRIDES = {
+    "Skagen,Storebælt Syd,Bornholms Gate": "The Great Belt",
+    "Skagen,Sundet Syd,Bornholms Gate": "The Sound",
+    "Kiel,Kadetrenden,Bornholms Gate": "The Kieler Canal",
+}
 SPATIAL_AREA_GROUPS = {
     1: ("Small", "high"),
     2: ("Medium", "high"),
@@ -1370,7 +1375,7 @@ def plot_passage_query_grouped(
             continue
 
         crossings_raw = match.group("crossings").strip()
-        passage_label = crossings_raw
+        passage_label = PASSAGE_LABEL_OVERRIDES.get(crossings_raw, crossings_raw)
         if passage_label not in passage_labels_seen:
             passage_labels_seen.append(passage_label)
 
@@ -1415,7 +1420,9 @@ def plot_passage_query_grouped(
             )
 
     if not rows:
-        if thread_filter:
+        if not passage_labels_seen:
+            print("No passage query benchmark data found; skipping grouped chart.")
+        elif thread_filter:
             print(
                 "Requested thread filters were not found in passage query data; skipping grouped chart."
             )
@@ -1491,7 +1498,7 @@ def plot_passage_query_grouped(
         xaxis=dict(
             categoryorder="array",
             categoryarray=passage_order,
-            title="Crossings",
+            title="",
         ),
         yaxis=dict(title="Execution median (ms)", type="log"),
     )

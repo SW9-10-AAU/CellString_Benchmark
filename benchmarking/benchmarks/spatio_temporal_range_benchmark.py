@@ -16,7 +16,7 @@ from benchmarking.table_config import (
 
 
 def _parse_start() -> datetime:
-    raw = os.getenv("TEMPORAL_RANGE_START", "2025-12-01 00:00:00")
+    raw = os.getenv("TEMPORAL_RANGE_START", "2026-02-01 00:00:00")
     return datetime.fromisoformat(raw.replace("Z", "+00:00"))
 
 

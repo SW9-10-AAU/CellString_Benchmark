@@ -8,37 +8,46 @@ from benchmarking.table_config import (
     TRAJECTORY_LS_TABLE,
 )
 
-ST_SQL = """
-WITH query_traj AS (
-    SELECT mmsi, geom, ts_start, ts_end
-    FROM {trajectory_ls_table}
-    WHERE trajectory_id = ?
+ST_SETUP_SQL = """
+SET VARIABLE query_traj_id = ?;
+SET VARIABLE query_traj_mmsi = (SELECT mmsi FROM {trajectory_ls_table} WHERE trajectory_id = getvariable('query_traj_id'));
+SET VARIABLE query_traj_geom = (SELECT geom FROM {trajectory_ls_table} WHERE trajectory_id = getvariable('query_traj_id'));
+SET VARIABLE query_traj_ts_start = (SELECT ts_start FROM {trajectory_ls_table} WHERE trajectory_id = getvariable('query_traj_id'));
+SET VARIABLE query_traj_ts_end = (SELECT ts_end FROM {trajectory_ls_table} WHERE trajectory_id = getvariable('query_traj_id'));
+""".format(
+    trajectory_ls_table=TRAJECTORY_LS_TABLE
 )
+
+ST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_ls_table} t
-JOIN query_traj q ON ST_Intersects(t.geom, q.geom)
-WHERE t.mmsi <> q.mmsi
-  AND t.ts_start <= q.ts_end
-  AND t.ts_end >= q.ts_start
+WHERE ST_Intersects(t.geom, getvariable('query_traj_geom'))
+ AND t.mmsi <> getvariable('query_traj_mmsi')
+ AND t.ts_start <= getvariable('query_traj_ts_end')
+ AND t.ts_end >= getvariable('query_traj_ts_start')
 
 UNION ALL
 
 SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS source
 FROM {stop_poly_table} s
-JOIN query_traj q ON ST_Intersects(s.geom, q.geom)
-WHERE s.mmsi <> q.mmsi
-  AND s.ts_start <= q.ts_end
-  AND s.ts_end >= q.ts_start;
+WHERE ST_Intersects(s.geom, getvariable('query_traj_geom'))
+ AND s.mmsi <> getvariable('query_traj_mmsi')
+ AND s.ts_start <= getvariable('query_traj_ts_end')
+ AND s.ts_end >= getvariable('query_traj_ts_start');
 """.format(
     trajectory_ls_table=TRAJECTORY_LS_TABLE,
     stop_poly_table=STOP_POLY_TABLE,
 )
 
+CST_SETUP_SQL = """
+SET VARIABLE query_traj_id = ?;
+"""
+
 CST_SQL = """
 WITH query_traj AS (
     SELECT mmsi, trajectory_id, ts, delta_sec, cell_z21
     FROM {trajectory_cs_table}
-    WHERE trajectory_id = ?
+    WHERE trajectory_id = getvariable('query_traj_id')
 )
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_cs_table} t
@@ -65,7 +74,10 @@ def build_spatio_temporal_join_benchmark() -> TimeBenchmark:
         name="Spatio-temporal join (ID temporal)",
         st_sql=ST_SQL,
         cst_sql=CST_SQL,
+        st_setup_sql=ST_SETUP_SQL,
+        cst_setup_sql=CST_SETUP_SQL,
         with_trajectory_ids=True,
+        setup_uses_id=True,
     )
 
 SPATIO_TEMPORAL_JOIN_BENCHMARKS = [

@@ -76,6 +76,11 @@ def _traffic_for_area_id(area_id: int) -> Optional[str]:
     return area_info[1]
 
 
+def _get_linestring_length_map(meta: Dict[str, Any]) -> Dict[int, float]:
+    lengths = meta.get("trajectory_lengths", {})
+    return {int(k): float(v) for k, v in lengths.items()}
+
+
 def _spatio_temporal_area_label(area_id: int) -> str:
     area_info = SPATIAL_AREA_GROUPS.get(area_id)
     if area_info is not None:
@@ -1782,6 +1787,88 @@ def plot_area_mmsi_coverage(benchmarks: List[Dict[str, Any]], top_k: int = 3) ->
         print(f"Wrote MMSI coverage plot for area {area_id} to {output_path}")
 
 
+def plot_cellstring_delta(
+    benchmarks: List[Dict[str, Any]], meta: Dict[str, Any]
+) -> None:
+    length_map = _get_linestring_length_map(meta)
+    if not length_map:
+        print(
+            "No LineString length data found in the report; skipping Execution time vs. LineString length plot."
+        )
+        return
+
+    rows: List[Dict[str, Any]] = []
+
+    def _collect_samples(
+        samples: List[Dict[str, Any]], series: str, bench_name: str
+    ) -> None:
+        for sample in samples or []:
+            traj_id = sample.get("trajectory_id")
+            exec_ms = sample.get("exec_ms")
+            if traj_id is None or exec_ms is None:
+                continue
+            length_km = length_map.get(int(traj_id))
+            if length_km is None:
+                continue
+            rows.append(
+                {
+                    "benchmark": bench_name,
+                    "series": series,
+                    "trajectory_id": traj_id,
+                    "length_km": length_km,
+                    "exec_ms": exec_ms,
+                }
+            )
+
+    cst_series_name = _cellstring_series_name(meta)
+    for bench in benchmarks:
+        if bench.get("benchmark_type") != "time":
+            continue
+        # Only apply to spatio-temporal join queries (ID Temporal)
+        if "Spatio-temporal join" not in bench["name"]:
+            continue
+        result = bench.get("result", {})
+        _collect_samples(
+            result.get("st", {}).get("samples", []), LINESTRING_SERIES, bench["name"]
+        )
+        _collect_samples(
+            result.get("cst", {}).get("samples", []), cst_series_name, bench["name"]
+        )
+
+    if not rows:
+        print(
+            "No benchmark samples with LineString lengths for Spatio-temporal join; skipping Execution time vs. LineString length plot."
+        )
+        return
+
+    df = pd.DataFrame(rows).sort_values(["benchmark", "series", "length_km"])
+    fig = px.scatter(
+        df,
+        x="length_km",
+        y="exec_ms",
+        color="series",
+        color_discrete_map=_series_color_map(df["series"].tolist()),
+        category_orders={"series": [LINESTRING_SERIES, cst_series_name]},
+        labels={
+            "length_km": "LineString length (km)",
+            "exec_ms": "Execution time (ms)",
+            "series": "Data",
+        },
+        log_y=True,
+        log_x=True,
+        trendline="lowess",
+        trendline_options=dict(frac=0.2),
+    )
+    fig.update_layout(
+        width=1000,
+        height=650,
+    )
+    _apply_transparent_theme(fig, legend_horizontal=True)
+    output_path = _next_output_path("cellstring_delta")
+    fig.write_image(output_path)
+    print(f"Wrote Execution time vs. LineString length plot to {output_path}")
+
+
 def run_all_graphs(
     report_path: Path,
     selected_benchmarks: Optional[List[str]] = None,
@@ -1844,6 +1931,9 @@ def run_all_graphs(
             data.get("meta", {}),
             selected_threads=selected_threads,
         )
+
+    if wants("cellstring_delta"):
+        plot_cellstring_delta(benchmarks, data.get("meta", {}))
 
 
 def main(

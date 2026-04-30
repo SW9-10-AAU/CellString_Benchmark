@@ -259,6 +259,33 @@ def main() -> None:
             trajectory_id_column,
             trajectory_sample_size,
         )
+        
+        trajectory_cardinalities: Dict[str, int] = {}
+        trajectory_lengths: Dict[str, float] = {}
+        if trajectory_ids:
+            try:
+                placeholders = ", ".join(["?"] * len(trajectory_ids))
+                # Cardinality from CellString
+                cs_rows = conn.execute(
+                    f"SELECT trajectory_id, COUNT(*) FROM {trajectory_id_source_table} WHERE trajectory_id IN ({placeholders}) GROUP BY trajectory_id",
+                    trajectory_ids
+                ).fetchall()
+                for r in cs_rows:
+                    if r[1] is not None:
+                        trajectory_cardinalities[str(int(r[0]))] = int(r[1])
+                
+                # Length from LineString
+                ls_table = os.getenv("TRAJECTORY_LS_TABLE", "p10_ls.trajectory_ls")
+                ls_rows = conn.execute(
+                    f"SELECT trajectory_id, ST_Length(geom) / 1000.0 FROM {ls_table} WHERE trajectory_id IN ({placeholders})",
+                    trajectory_ids
+                ).fetchall()
+                for r in ls_rows:
+                    if r[1] is not None:
+                        trajectory_lengths[str(int(r[0]))] = float(r[1])
+            except Exception as e:
+                print(f"Warning: Failed to fetch trajectory metadata: {e}")
+
         stop_ids = _fetch_random_ids(
             conn, stop_id_source_table, stop_id_column, stop_sample_size
         )
@@ -328,6 +355,8 @@ def main() -> None:
                 "thread_plan": thread_counts,
                 "trajectory_count": len(trajectory_ids),
                 "trajectory_ids": trajectory_ids,
+                "trajectory_cardinalities": trajectory_cardinalities,
+                "trajectory_lengths": trajectory_lengths,
                 "stop_count": len(stop_ids),
                 "stop_ids": stop_ids,
                 "cold_run_note": "For cold runs on Linux: sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches",

@@ -24,6 +24,7 @@ class TimeBenchmark:
     with_stop_ids: bool = False
     region_ids: List[int] = field(default_factory=list)
     use_region_ids: bool = False
+    setup_uses_id: bool = False
 
 
 @dataclass(frozen=True)
@@ -195,6 +196,7 @@ def _execute_random_or_repeated_queries(
     sample_label: str | None = None,
     setup_sql: str = "",
     setup_params: Sequence[Any] = tuple(),
+    setup_uses_id: bool = False,
 ) -> RunOutcome:
     if trajectory_ids is not None and not trajectory_ids:
         return RunOutcome(0.0, [])
@@ -207,22 +209,24 @@ def _execute_random_or_repeated_queries(
 
     if trajectory_ids is not None:
         first_params = (trajectory_ids[0],) + base_params
+        first_setup_params = (trajectory_ids[0],) + tuple(setup_params) if setup_uses_id else setup_params
         _warmup(
             cur,
             sql,
             first_params,
             setup_sql=setup_sql,
-            setup_params=setup_params,
+            setup_params=first_setup_params,
         )
 
         for trajectory_id in trajectory_ids:
             current_params = (trajectory_id,) + base_params
+            current_setup_params = (trajectory_id,) + tuple(setup_params) if setup_uses_id else setup_params
             rows, exec_ms = _execute_with_timing(
                 cur,
                 sql,
                 current_params,
                 setup_sql=setup_sql,
-                setup_params=setup_params,
+                setup_params=current_setup_params,
             )
             exec_times.append(exec_ms)
             collected_rows.extend(rows)
@@ -234,22 +238,24 @@ def _execute_random_or_repeated_queries(
             sample_records.append(sample)
     elif stop_ids is not None:
         first_params = (stop_ids[0],) + base_params
+        first_setup_params = (stop_ids[0],) + tuple(setup_params) if setup_uses_id else setup_params
         _warmup(
             cur,
             sql,
             first_params,
             setup_sql=setup_sql,
-            setup_params=setup_params,
+            setup_params=first_setup_params,
         )
 
         for stop_id in stop_ids:
             current_params = (stop_id,) + base_params
+            current_setup_params = (stop_id,) + tuple(setup_params) if setup_uses_id else setup_params
             rows, exec_ms = _execute_with_timing(
                 cur,
                 sql,
                 current_params,
                 setup_sql=setup_sql,
-                setup_params=setup_params,
+                setup_params=current_setup_params,
             )
             exec_times.append(exec_ms)
             collected_rows.extend(rows)
@@ -344,6 +350,7 @@ def run_time_benchmark(
                 sample_label="LineString",
                 setup_sql=benchmark.st_setup_sql,
                 setup_params=benchmark.st_setup_params,
+                setup_uses_id=benchmark.setup_uses_id,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
@@ -353,6 +360,7 @@ def run_time_benchmark(
                 sample_label="CellString",
                 setup_sql=benchmark.cst_setup_sql,
                 setup_params=benchmark.cst_setup_params,
+                setup_uses_id=benchmark.setup_uses_id,
             )
         elif benchmark.with_stop_ids:
             st_out = _execute_random_or_repeated_queries(
@@ -362,6 +370,7 @@ def run_time_benchmark(
                 stop_ids=stop_ids,
                 setup_sql=benchmark.st_setup_sql,
                 setup_params=benchmark.st_setup_params,
+                setup_uses_id=benchmark.setup_uses_id,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
@@ -371,6 +380,7 @@ def run_time_benchmark(
                 sample_label="CellString",
                 setup_sql=benchmark.cst_setup_sql,
                 setup_params=benchmark.cst_setup_params,
+                setup_uses_id=benchmark.setup_uses_id,
             )
         else:
             st_out = _execute_random_or_repeated_queries(

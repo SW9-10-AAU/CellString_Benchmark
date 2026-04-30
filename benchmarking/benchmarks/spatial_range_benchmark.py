@@ -75,5 +75,5 @@ def build_spatial_range_benchmark(region_id: int) -> TimeBenchmark:
 
 
 SPATIAL_RANGE_BENCHMARKS = [
-    build_spatial_range_benchmark(region_id) for region_id in (1, 2, 3, 7, 8, 9)
+    build_spatial_range_benchmark(region_id) for region_id in (1, 2, 3, 4, 5, 6)
 ]

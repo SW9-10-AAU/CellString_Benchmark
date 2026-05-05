@@ -77,6 +77,7 @@ def build_spatio_temporal_join_benchmark() -> TimeBenchmark:
         st_setup_sql=ST_SETUP_SQL,
         cst_setup_sql=CST_SETUP_SQL,
         with_trajectory_ids=True,
+        sql_uses_id=False,
         setup_uses_id=True,
     )
 

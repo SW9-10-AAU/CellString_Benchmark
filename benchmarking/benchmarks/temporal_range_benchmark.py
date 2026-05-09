@@ -14,7 +14,7 @@ from benchmarking.table_config import (
 
 
 def _parse_start() -> datetime:
-    raw = os.getenv("TEMPORAL_RANGE_START", "2025-12-01 00:00:00")
+    raw = os.getenv("TEMPORAL_RANGE_START", "2025-10-01 00:00:00")
     # Accept both 'YYYY-MM-DD HH:MM:SS' and full ISO-8601 values.
     return datetime.fromisoformat(raw.replace("Z", "+00:00"))
 
@@ -57,8 +57,8 @@ SET VARIABLE ts_period_end = CAST(? AS TIMESTAMP);
 CST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_cs_table} AS t
-WHERE t.ts <= getvariable('ts_period_end')
-  AND t.ts + (INTERVAL (t.delta_sec) SECOND) >= getvariable('ts_period_start')
+WHERE t.ts_entry <= getvariable('ts_period_end')
+  AND t.ts_exit >= getvariable('ts_period_start')
 
 UNION ALL
 
@@ -91,7 +91,8 @@ def build_temporal_range_benchmark(label: str, days: int) -> TimeBenchmark:
 
 
 TEMPORAL_RANGE_BENCHMARKS: List[TimeBenchmark] = [
-    build_temporal_range_benchmark("1 day", 1),
-    build_temporal_range_benchmark("1 week", 7),
-    build_temporal_range_benchmark("1 month", 30),
+    build_temporal_range_benchmark("1", 1),
+    build_temporal_range_benchmark("7", 7),
+    build_temporal_range_benchmark("30", 30),
+    build_temporal_range_benchmark("180", 180),
 ]

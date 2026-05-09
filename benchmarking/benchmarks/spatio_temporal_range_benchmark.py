@@ -16,7 +16,7 @@ from benchmarking.table_config import (
 
 
 def _parse_start() -> datetime:
-    raw = os.getenv("TEMPORAL_RANGE_START", "2026-02-01 00:00:00")
+    raw = os.getenv("TEMPORAL_RANGE_START", "2025-10-01 00:00:00")
     return datetime.fromisoformat(raw.replace("Z", "+00:00"))
 
 
@@ -73,8 +73,8 @@ WITH query_region AS (
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, r.region_id, 'trajectory' AS source
 FROM {trajectory_cs_table} AS t
 JOIN query_region AS r ON t.cell_z21 = r.cell_z21
-WHERE t.ts <= getvariable('ts_period_end')
-  AND t.ts + (INTERVAL (t.delta_sec) SECOND) >= getvariable('ts_period_start')
+WHERE t.ts_entry <= getvariable('ts_period_end')
+  AND t.ts_exit >= getvariable('ts_period_start')
 
 UNION ALL
 
@@ -112,15 +112,19 @@ def build_spatio_temporal_range_benchmark(
 
 SPATIO_TEMPORAL_RANGE_BENCHMARKS: List[TimeBenchmark] = (
     [
-        build_spatio_temporal_range_benchmark("1 day", 1, region_id)
+        build_spatio_temporal_range_benchmark("1", 1, region_id)
         for region_id in (1, 2, 3, 4, 5, 6)
     ]
     + [
-        build_spatio_temporal_range_benchmark("1 week", 7, region_id)
+        build_spatio_temporal_range_benchmark("7", 7, region_id)
         for region_id in (1, 2, 3, 4, 5, 6)
     ]
     + [
-        build_spatio_temporal_range_benchmark("1 month", 30, region_id)
+        build_spatio_temporal_range_benchmark("30", 30, region_id)
+        for region_id in (1, 2, 3, 4, 5, 6)
+    ]
+    + [
+        build_spatio_temporal_range_benchmark("180", 180, region_id)
         for region_id in (1, 2, 3, 4, 5, 6)
     ]
 )

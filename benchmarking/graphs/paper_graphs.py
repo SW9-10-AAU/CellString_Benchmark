@@ -14,7 +14,7 @@ from matplotlib.ticker import ScalarFormatter
 try:
     import scienceplots
 
-    plt.style.use(["science", "bright"])
+    plt.style.use(["science", "vibrant"])
     # Override standard IEEE 8pt to ACM 9pt
     plt.rcParams.update(
         {
@@ -182,10 +182,12 @@ def plot_temporal_range(
             x="window",
             y="exec_ms",
             hue="series",
+            style="series",
             ax=ax,
-            marker="o",
+            markers=True,
+            dashes=False,
+            markersize=6,
             linewidth=1.5,
-            markersize=5,
         )
     else:
         sns.barplot(
@@ -221,10 +223,14 @@ def plot_temporal_range(
     base_ticks = [1, 2.5, 5, 7.5]
     ticks = np.array([b * (10**p) for p in range(0, 6) for b in base_ticks])
     y_min, y_max = np.min(y_data), np.max(y_data)
-    bottom_tick = ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
-    top_tick = ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+    bottom_tick = (
+        ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
+    )
+    top_tick = (
+        ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+    )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
-    
+
     ax.set_ylim(bottom=bottom_tick, top=top_tick)
     ax.set_yticks(visible_ticks)
 
@@ -312,10 +318,12 @@ def plot_spatial_range(
             x="area",
             y="exec_ms",
             hue="series",
+            style="series",
             ax=ax,
-            marker="o",
+            markers=True,
+            dashes=False,
+            markersize=6,
             linewidth=1.5,
-            markersize=5,
         )
     else:
         sns.barplot(
@@ -348,10 +356,14 @@ def plot_spatial_range(
     base_ticks = [1, 2.5, 5, 7.5]
     ticks = np.array([b * (10**p) for p in range(0, 6) for b in base_ticks])
     y_min, y_max = np.min(y_data), np.max(y_data)
-    bottom_tick = ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
-    top_tick = ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+    bottom_tick = (
+        ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
+    )
+    top_tick = (
+        ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+    )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
-    
+
     ax.set_ylim(bottom=bottom_tick, top=top_tick)
     ax.set_yticks(visible_ticks)
 
@@ -455,10 +467,12 @@ def plot_spatio_temporal_range(
                     x="area_short",
                     y="exec_ms",
                     hue="series",
+                    style="series",
                     ax=ax,
-                    marker="o",
+                    markers=True,
+                    dashes=False,
+                    markersize=6,
                     linewidth=1.5,
-                    markersize=5,
                 )
             else:
                 sns.barplot(
@@ -492,10 +506,14 @@ def plot_spatio_temporal_range(
     base_ticks = [1, 2.5, 5, 7.5]
     ticks = np.array([b * (10**p) for p in range(0, 6) for b in base_ticks])
     y_min, y_max = np.min(y_data), np.max(y_data)
-    bottom_tick = ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
-    top_tick = ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+    bottom_tick = (
+        ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
+    )
+    top_tick = (
+        ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+    )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
-    
+
     axes[0].set_ylim(bottom=bottom_tick, top=top_tick)
     axes[0].set_yticks(visible_ticks)
 

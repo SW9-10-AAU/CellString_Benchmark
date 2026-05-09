@@ -8,3 +8,4 @@ pytest-timeout==2.4.0
 matplotlib
 seaborn
 scienceplots
+numpy

@@ -79,7 +79,7 @@ Use `benchmarking/benchmarks/duckdb_query_templates.py` as the starting point an
 
 Parameter style for DuckDB is `?` (not `%s`).
 
-## Graphs
+## ~~Graphs~~ - DEPRECATED
 
 Set `DEFAULT_REPORT_JSON` in `benchmarking/graphs/graph_generation.py` if you want a fixed JSON file without passing it on the command line. Leave it as `None` to auto-pick the newest report.
 

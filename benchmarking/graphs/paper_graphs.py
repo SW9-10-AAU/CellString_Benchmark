@@ -10,19 +10,33 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.ticker import ScalarFormatter
 
+# ── Global font size for all graph text ──────────────────────────────────────
+FONT_SIZE = 8
+
+# Vibrant palette colors (Paul Tol)
+VIBRANT_COLORS = [
+    "#EE7733",
+    "#0077BB",
+    "#33BBEE",
+    "#EE3377",
+    "#CC3311",
+    "#009988",
+    "#BBBBBB",
+]
+
 # Try to use scienceplots if available, otherwise fallback to standard styling
 try:
     import scienceplots
 
     plt.style.use(["science", "vibrant"])
-    # Override standard IEEE 8pt to ACM 9pt
     plt.rcParams.update(
         {
-            "font.size": 9,
-            "axes.labelsize": 9,
-            "legend.fontsize": 8,
-            "xtick.labelsize": 8,
-            "ytick.labelsize": 8,
+            "font.size": FONT_SIZE,
+            "axes.labelsize": FONT_SIZE,
+            "axes.titlesize": FONT_SIZE,
+            "legend.fontsize": FONT_SIZE,
+            "xtick.labelsize": FONT_SIZE,
+            "ytick.labelsize": FONT_SIZE,
         }
     )
 except ImportError:
@@ -41,18 +55,18 @@ except ImportError:
             "mathtext.rm": "Linux Libertine O",
             "mathtext.it": "Linux Libertine O:italic",
             "mathtext.bf": "Linux Libertine O:bold",
-            "font.size": 9,
-            "axes.labelsize": 9,
-            "axes.titlesize": 9,
-            "legend.fontsize": 8,
-            "xtick.labelsize": 8,
-            "ytick.labelsize": 8,
+            "font.size": FONT_SIZE,
+            "axes.labelsize": FONT_SIZE,
+            "axes.titlesize": FONT_SIZE,
+            "legend.fontsize": FONT_SIZE,
+            "xtick.labelsize": FONT_SIZE,
+            "ytick.labelsize": FONT_SIZE,
             "axes.linewidth": 0.5,
             "grid.linewidth": 0.5,
             "grid.alpha": 0.5,
             "lines.linewidth": 1.0,
             "lines.markersize": 3,
-            "pdf.fonttype": 42,  # Embed fonts in PDF
+            "pdf.fonttype": 42,
             "ps.fonttype": 42,
         }
     )
@@ -94,21 +108,31 @@ TEMPORAL_RANGE_NAME_PATTERN = re.compile(
 )
 
 SPATIAL_AREA_GROUPS = {
-    1: ("Small", "high"),
-    2: ("Medium", "high"),
-    3: ("Large", "high"),
-    7: ("Small", "low"),
-    8: ("Medium", "low"),
-    9: ("Large", "low"),
+    1: ("1", "high"),
+    2: ("24", "high"),
+    3: ("435", "high"),
+    4: ("1", "low"),
+    5: ("24", "low"),
+    6: ("435", "low"),
 }
-SPATIAL_AREA_ORDER = ["Small", "Medium", "Large"]
+SPATIAL_AREA_ORDER = ["1", "24", "435"]
 SPATIAL_RANGE_NAME_PATTERN = re.compile(
-    r"^Spatial range query\s*-\s*area\s*(?P<region_id>\d+)$", re.IGNORECASE
+    r"^Spatial range query\s*-\s*(?:area|region)\s*(?P<region_id>\d+)$", re.IGNORECASE
 )
 SPATIO_TEMPORAL_RANGE_NAME_PATTERN = re.compile(
-    r"^Spatio-temporal range query - area\s*(?P<region_id>\d+)\s*\((?P<window>[^)]+)\)$",
+    r"^Spatio-temporal range query - (?:area|region)\s*(?P<region_id>\d+)\s*\((?P<window>[^)]+)\)$",
     re.IGNORECASE,
 )
+PASSAGE_QUERY_NAME_PATTERN = re.compile(
+    r"^Passage query - crossings\s*(?P<crossings>.+)$",
+    re.IGNORECASE,
+)
+PASSAGE_NAME_MAP = {
+    "Skagen,Storebælt Syd,Bornholms Gate": "The Great Belt",
+    "Skagen,Sundet Syd,Bornholms Gate": "The Sound",
+    "Kiel,Kadetrenden,Bornholms Gate": "The Kieler Kanal",
+}
+PASSAGE_ORDER = ["The Great Belt", "The Sound", "The Kieler Kanal"]
 
 
 def _load_report(path: str) -> Dict[str, Any]:
@@ -125,7 +149,7 @@ def plot_temporal_range(
     benchmarks = data.get("benchmarks", [])
     rows = []
 
-    window_order = ["1 day", "1 week", "1 month"]
+    window_order = ["1", "7", "30", "180"]
 
     for bench in benchmarks:
         if bench.get("benchmark_type") != "time":
@@ -201,7 +225,7 @@ def plot_temporal_range(
         )
 
     ax.set_ylabel("Execution median (ms)")
-    ax.set_xlabel("")
+    ax.set_xlabel("Time window (day)")
 
     ax.set_yscale("log")
 
@@ -209,25 +233,34 @@ def plot_temporal_range(
     formatter.set_scientific(False)
     ax.yaxis.set_major_formatter(formatter)
 
-    # Hide the minor ticks since we specified detailed major ticks
+    # Hide the minor ticks on both axes
     ax.yaxis.set_minor_locator(plt.NullLocator())
+    ax.xaxis.set_minor_locator(plt.NullLocator())
 
     # Minimalist grid
     ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
     ax.set_axisbelow(True)
 
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles=handles, labels=labels, title="", loc="best", frameon=False)
+    # Remove inline legend; we'll draw a floating one after layout
+    if ax.get_legend():
+        ax.get_legend().remove()
 
     y_data = df["exec_ms"]
     base_ticks = [1, 2.5, 5, 7.5]
     ticks = np.array([b * (10**p) for p in range(0, 6) for b in base_ticks])
     y_min, y_max = np.min(y_data), np.max(y_data)
+    # Use one tick BELOW the lowest and one ABOVE the highest for buffer
+    below_ticks = ticks[ticks <= y_min]
+    above_ticks = ticks[ticks >= y_max]
     bottom_tick = (
-        ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
+        below_ticks[-2]
+        if len(below_ticks) >= 2
+        else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
     )
     top_tick = (
-        ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+        above_ticks[1]
+        if len(above_ticks) >= 2
+        else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
     )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
 
@@ -236,12 +269,25 @@ def plot_temporal_range(
 
     plt.tight_layout(pad=0.1)
 
+    # Floating legend above the plot, centered on the axes
+    box = ax.get_position()
+    center_x = (box.x0 + box.x1) / 2
+    handles, labels = ax.get_legend_handles_labels()
+    legend_y = box.y1 + 0.02
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(center_x, legend_y),
+        ncol=2,
+        frameon=False,
+    )
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     pgf_path = _next_output_path("temporal_range_paper", ".pgf")
 
     try:
-        # Saving as PGF requires LaTeX
         fig.savefig(pgf_path, format="pgf", bbox_inches="tight")
         print(f"Successfully saved to {pgf_path}")
     except Exception as e:
@@ -252,12 +298,13 @@ def plot_temporal_range(
 
 def plot_spatial_range(
     data: Dict[str, Any],
-    traffic: str = "high",
     thread_filter: List[int] = None,
     plot_type: str = "bar",
 ) -> None:
     benchmarks = data.get("benchmarks", [])
     rows = []
+
+    traffic_labels = {"high": "High traffic", "low": "Low traffic"}
 
     for bench in benchmarks:
         if bench.get("benchmark_type") != "time":
@@ -274,8 +321,6 @@ def plot_spatial_range(
             continue
 
         area_label, traffic_class = area_info
-        if traffic_class != traffic:
-            continue
 
         thread_count = int(bench.get("thread_count") or 1)
         if thread_filter and thread_count not in thread_filter:
@@ -285,11 +330,13 @@ def plot_spatial_range(
         st_exec = result.get("st", {}).get("exec_ms_med")
         cst_exec = result.get("cst", {}).get("exec_ms_med")
 
+        traffic_suffix = traffic_labels[traffic_class]
+
         if st_exec is not None:
             rows.append(
                 {
                     "area": area_label,
-                    "series": LINESTRING_SERIES,
+                    "series": f"{LINESTRING_SERIES} ({traffic_suffix})",
                     "exec_ms": float(st_exec),
                 }
             )
@@ -298,46 +345,73 @@ def plot_spatial_range(
             rows.append(
                 {
                     "area": area_label,
-                    "series": CELLSTRING_SERIES,
+                    "series": f"{CELLSTRING_SERIES} ({traffic_suffix})",
                     "exec_ms": float(cst_exec),
                 }
             )
 
     if not rows:
-        print(f"No spatial range benchmark data found for {traffic} traffic.")
+        print("No spatial range benchmark data found.")
         return
 
     df = pd.DataFrame(rows)
     df["area"] = pd.Categorical(df["area"], categories=SPATIAL_AREA_ORDER, ordered=True)
 
+    series_order = [
+        f"{LINESTRING_SERIES} (Low traffic)",
+        f"{LINESTRING_SERIES} (High traffic)",
+        f"{CELLSTRING_SERIES} (Low traffic)",
+        f"{CELLSTRING_SERIES} (High traffic)",
+    ]
+    df["series"] = pd.Categorical(df["series"], categories=series_order, ordered=True)
+
+    palette = {
+        series_order[0]: VIBRANT_COLORS[3],  # LS Low  -> 4th
+        series_order[1]: VIBRANT_COLORS[0],  # LS High -> 1st
+        series_order[2]: VIBRANT_COLORS[2],  # CS Low  -> 3rd
+        series_order[3]: VIBRANT_COLORS[1],  # CS High -> 2nd
+    }
+
+    # Explicit marker assignment per series
+    marker_map = {
+        series_order[0]: "s",  # LS Low  -> square
+        series_order[1]: "o",  # LS High -> circle
+        series_order[2]: "P",  # CS Low  -> plus
+        series_order[3]: "X",  # CS High -> x
+    }
+
     fig, ax = plt.subplots(figsize=(3.33, 2.2))
 
     if plot_type == "line":
-        sns.lineplot(
-            data=df,
-            x="area",
-            y="exec_ms",
-            hue="series",
-            style="series",
-            ax=ax,
-            markers=True,
-            dashes=False,
-            markersize=6,
-            linewidth=1.5,
-        )
+        x_positions = list(range(len(SPATIAL_AREA_ORDER)))
+        for series_name in series_order:
+            subset = df[df["series"] == series_name].sort_values("area")
+            ax.plot(
+                x_positions,
+                subset["exec_ms"].values,
+                color=palette[series_name],
+                marker=marker_map[series_name],
+                label=series_name,
+                markersize=6,
+                linewidth=1.5,
+            )
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels(SPATIAL_AREA_ORDER)
     else:
         sns.barplot(
             data=df,
             x="area",
             y="exec_ms",
             hue="series",
+            hue_order=series_order,
+            palette=palette,
             ax=ax,
             edgecolor="black",
             linewidth=0.5,
         )
 
     ax.set_ylabel("Execution median (ms)")
-    ax.set_xlabel("")
+    ax.set_xlabel(r"Area ($\mathrm{km}^2$)")
 
     ax.set_yscale("log")
 
@@ -345,22 +419,31 @@ def plot_spatial_range(
     formatter.set_scientific(False)
     ax.yaxis.set_major_formatter(formatter)
     ax.yaxis.set_minor_locator(plt.NullLocator())
+    ax.xaxis.set_minor_locator(plt.NullLocator())
 
     ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
     ax.set_axisbelow(True)
 
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles=handles, labels=labels, title="", loc="best", frameon=False)
+    # Remove inline legend; we'll draw a floating one after layout
+    if ax.get_legend():
+        ax.get_legend().remove()
 
     y_data = df["exec_ms"]
     base_ticks = [1, 2.5, 5, 7.5]
     ticks = np.array([b * (10**p) for p in range(0, 6) for b in base_ticks])
     y_min, y_max = np.min(y_data), np.max(y_data)
+    # Use one tick BELOW the lowest and one ABOVE the highest for buffer
+    below_ticks = ticks[ticks <= y_min]
+    above_ticks = ticks[ticks >= y_max]
     bottom_tick = (
-        ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
+        below_ticks[-2]
+        if len(below_ticks) >= 2
+        else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
     )
     top_tick = (
-        ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+        above_ticks[1]
+        if len(above_ticks) >= 2
+        else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
     )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
 
@@ -368,9 +451,24 @@ def plot_spatial_range(
     ax.set_yticks(visible_ticks)
 
     plt.tight_layout(pad=0.1)
+
+    # Floating legend above the plot, centered on the axes
+    box = ax.get_position()
+    center_x = (box.x0 + box.x1) / 2
+    handles, labels = ax.get_legend_handles_labels()
+    legend_y = box.y1 + 0.02
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(center_x, legend_y),
+        ncol=2,
+        frameon=False,
+    )
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    pgf_path = _next_output_path(f"spatial_range_{traffic}_paper", ".pgf")
+    pgf_path = _next_output_path("spatial_range_paper", ".pgf")
 
     try:
         fig.savefig(pgf_path, format="pgf", bbox_inches="tight")
@@ -412,10 +510,8 @@ def plot_spatio_temporal_range(
         if thread_filter and thread_count not in thread_filter:
             continue
 
-        # Abbreviate area to fit in narrow subplots
-        area_short = {"Small": "S", "Medium": "M", "Large": "L"}.get(
-            area_label, area_label
-        )
+        # Use area label directly
+        area_short = area_label
 
         result = bench.get("result", {})
         st_exec = result.get("st", {}).get("exec_ms_med")
@@ -446,15 +542,15 @@ def plot_spatio_temporal_range(
         return
 
     df = pd.DataFrame(rows)
-    window_order = ["1 day", "1 week", "1 month"]
-    area_order_short = ["S", "M", "L"]
+    window_order = ["1", "7", "30", "180"]
+    area_order_short = SPATIAL_AREA_ORDER
 
     df["window"] = pd.Categorical(df["window"], categories=window_order, ordered=True)
     df["area_short"] = pd.Categorical(
         df["area_short"], categories=area_order_short, ordered=True
     )
 
-    fig, axes = plt.subplots(1, 3, figsize=(3.33, 2.2), sharey=True)
+    fig, axes = plt.subplots(1, len(window_order), figsize=(3.33, 2.2), sharey=True)
 
     for i, window in enumerate(window_order):
         ax = axes[i]
@@ -485,8 +581,10 @@ def plot_spatio_temporal_range(
                     linewidth=0.5,
                 )
 
-        ax.set_title(window, fontsize=9)
+        ax.set_title(window, fontsize=FONT_SIZE)
         ax.set_xlabel("")
+        plt.setp(ax.get_xticklabels(), rotation=0, ha="center", fontsize=FONT_SIZE)
+        ax.set_xlim(-0.3, len(area_order_short) - 1 + 0.3)
         ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
         ax.set_axisbelow(True)
         ax.set_yscale("log")
@@ -494,6 +592,7 @@ def plot_spatio_temporal_range(
         formatter.set_scientific(False)
         ax.yaxis.set_major_formatter(formatter)
         ax.yaxis.set_minor_locator(plt.NullLocator())
+        ax.xaxis.set_minor_locator(plt.NullLocator())
 
         if ax.get_legend():
             ax.get_legend().remove()
@@ -518,25 +617,336 @@ def plot_spatio_temporal_range(
     axes[0].set_yticks(visible_ticks)
 
     plt.tight_layout(pad=0.1)
+    fig.subplots_adjust(wspace=0, bottom=0.16)
 
-    # Calculate the exact visual center of the subplots AFTER tight_layout
+    # Calculate the exact visual center of the subplots AFTER tight_layout and adjustments
     box0 = axes[0].get_position()
     box2 = axes[-1].get_position()
     center_x = (box0.x0 + box2.x1) / 2
 
+    # Draw centered X-axis label beneath the subplots
+    fig.text(
+        center_x,
+        0.05,
+        r"Area ($\mathrm{km}^2$)",
+        ha="center",
+        va="center",
+        fontsize=FONT_SIZE,
+    )
+
+    # Draw centered top X-axis label above the subplots (dynamically spaced above the axes)
+    days_y = box0.y1 + 0.08
+    fig.text(
+        center_x,
+        days_y,
+        "Time window (day)",
+        ha="center",
+        va="bottom",
+        fontsize=FONT_SIZE,
+    )
+
     # Draw a global figure legend exactly over that center
     handles, labels = axes[0].get_legend_handles_labels()
+    legend_y = box0.y1 + 0.10
     fig.legend(
         handles,
         labels,
         loc="lower center",
-        bbox_to_anchor=(center_x, 1.0),
+        bbox_to_anchor=(center_x, legend_y),
         ncol=2,
         frameon=False,
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     pgf_path = _next_output_path(f"spatio_temporal_range_{traffic}_paper", ".pgf")
+
+    try:
+        fig.savefig(pgf_path, format="pgf", bbox_inches="tight")
+        print(f"Successfully saved to {pgf_path}")
+    except Exception as e:
+        print(f"Notice: Could not save PGF file: {e}")
+
+
+def plot_thread_scalability(
+    data: Dict[str, Any],
+    region_id: int = 3,
+) -> None:
+    """Plot thread scalability for a specific spatial range region."""
+    benchmarks = data.get("benchmarks", [])
+    rows = []
+
+    for bench in benchmarks:
+        if bench.get("benchmark_type") != "time":
+            continue
+
+        name = str(bench.get("name") or "")
+        match = SPATIAL_RANGE_NAME_PATTERN.match(name)
+        if not match:
+            continue
+
+        area_id = int(match.group("region_id"))
+        if area_id != region_id:
+            continue
+
+        thread_count = int(bench.get("thread_count") or 1)
+
+        result = bench.get("result", {})
+        st_exec = result.get("st", {}).get("exec_ms_med")
+        cst_exec = result.get("cst", {}).get("exec_ms_med")
+
+        if st_exec is not None:
+            rows.append(
+                {
+                    "threads": thread_count,
+                    "series": LINESTRING_SERIES,
+                    "exec_ms": float(st_exec),
+                }
+            )
+
+        if cst_exec is not None:
+            rows.append(
+                {
+                    "threads": thread_count,
+                    "series": CELLSTRING_SERIES,
+                    "exec_ms": float(cst_exec),
+                }
+            )
+
+    if not rows:
+        print(f"No thread scalability data found for region {region_id}.")
+        return
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values("threads")
+
+    thread_order = [str(t) for t in sorted(df["threads"].unique())]
+    df["threads"] = df["threads"].astype(str)
+    df["threads"] = pd.Categorical(df["threads"], categories=thread_order, ordered=True)
+
+    fig, ax = plt.subplots(figsize=(3.33, 2.2))
+
+    sns.lineplot(
+        data=df,
+        x="threads",
+        y="exec_ms",
+        hue="series",
+        style="series",
+        ax=ax,
+        markers=True,
+        dashes=False,
+        markersize=6,
+        linewidth=1.5,
+    )
+
+    ax.set_ylabel("Execution median (ms)")
+    ax.set_xlabel("Threads")
+
+    ax.set_yscale("log")
+
+    ax.xaxis.set_minor_locator(plt.NullLocator())
+
+    formatter = ScalarFormatter()
+    formatter.set_scientific(False)
+    ax.yaxis.set_major_formatter(formatter)
+    ax.yaxis.set_minor_locator(plt.NullLocator())
+
+    ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
+    ax.set_axisbelow(True)
+
+    # Remove inline legend
+    if ax.get_legend():
+        ax.get_legend().remove()
+
+    y_data = df["exec_ms"]
+    base_ticks = [1, 2.5, 5, 7.5]
+    ticks = np.array([b * (10**p) for p in range(0, 7) for b in base_ticks])
+    y_min, y_max = np.min(y_data), np.max(y_data)
+    # Use one tick BELOW the lowest and one ABOVE the highest for buffer
+    below_ticks = ticks[ticks <= y_min]
+    above_ticks = ticks[ticks >= y_max]
+    bottom_tick = (
+        below_ticks[-2]
+        if len(below_ticks) >= 2
+        else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
+    )
+    top_tick = (
+        above_ticks[1]
+        if len(above_ticks) >= 2
+        else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
+    )
+    visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
+
+    ax.set_ylim(bottom=bottom_tick, top=top_tick)
+    ax.set_yticks(visible_ticks)
+
+    plt.tight_layout(pad=0.1)
+
+    # Floating legend above the plot, centered on the axes
+    box = ax.get_position()
+    center_x = (box.x0 + box.x1) / 2
+    handles, labels = ax.get_legend_handles_labels()
+    legend_y = box.y1 + 0.02
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(center_x, legend_y),
+        ncol=2,
+        frameon=False,
+    )
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    pgf_path = _next_output_path("thread_scalability_paper", ".pgf")
+
+    try:
+        fig.savefig(pgf_path, format="pgf", bbox_inches="tight")
+        print(f"Successfully saved to {pgf_path}")
+    except Exception as e:
+        print(f"Notice: Could not save PGF file: {e}")
+
+
+def _normalize_passage_key(crossings: str) -> str:
+    parts = [part.strip() for part in crossings.split(",") if part.strip()]
+    return ",".join(parts)
+
+
+def plot_passage_query(
+    data: Dict[str, Any],
+    thread_filter: List[int] = None,
+    plot_type: str = "line",
+) -> None:
+    benchmarks = data.get("benchmarks", [])
+    rows = []
+
+    for bench in benchmarks:
+        if bench.get("benchmark_type") != "time":
+            continue
+
+        name = str(bench.get("name") or "")
+        match = PASSAGE_QUERY_NAME_PATTERN.match(name)
+        if not match:
+            continue
+
+        thread_count = int(bench.get("thread_count") or 1)
+        if thread_filter and thread_count not in thread_filter:
+            continue
+
+        crossings = _normalize_passage_key(match.group("crossings"))
+        passage_label = PASSAGE_NAME_MAP.get(crossings, crossings)
+
+        result = bench.get("result", {})
+        st_exec = result.get("st", {}).get("exec_ms_med")
+        cst_exec = result.get("cst", {}).get("exec_ms_med")
+
+        if st_exec is not None:
+            rows.append(
+                {
+                    "passage": passage_label,
+                    "series": LINESTRING_SERIES,
+                    "exec_ms": float(st_exec),
+                }
+            )
+
+        if cst_exec is not None:
+            rows.append(
+                {
+                    "passage": passage_label,
+                    "series": CELLSTRING_SERIES,
+                    "exec_ms": float(cst_exec),
+                }
+            )
+
+    if not rows:
+        print("No passage query benchmark data found.")
+        return
+
+    df = pd.DataFrame(rows)
+    df["passage"] = pd.Categorical(
+        df["passage"], categories=PASSAGE_ORDER, ordered=True
+    )
+
+    fig, ax = plt.subplots(figsize=(3.33, 2.2))
+
+    if plot_type == "bar":
+        sns.barplot(
+            data=df,
+            x="passage",
+            y="exec_ms",
+            hue="series",
+            ax=ax,
+            edgecolor="black",
+            linewidth=0.5,
+        )
+    else:
+        sns.lineplot(
+            data=df,
+            x="passage",
+            y="exec_ms",
+            hue="series",
+            style="series",
+            ax=ax,
+            markers=True,
+            dashes=False,
+            markersize=6,
+            linewidth=1.5,
+        )
+
+    ax.set_ylabel("Execution median (ms)")
+    ax.set_xlabel("Passage")
+
+    ax.set_yscale("log")
+
+    formatter = ScalarFormatter()
+    formatter.set_scientific(False)
+    ax.yaxis.set_major_formatter(formatter)
+    ax.yaxis.set_minor_locator(plt.NullLocator())
+    ax.xaxis.set_minor_locator(plt.NullLocator())
+
+    ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
+    ax.set_axisbelow(True)
+
+    if ax.get_legend():
+        ax.get_legend().remove()
+
+    y_data = df["exec_ms"]
+    base_ticks = [1, 2.5, 5, 7.5]
+    ticks = np.array([b * (10**p) for p in range(0, 6) for b in base_ticks])
+    y_min, y_max = np.min(y_data), np.max(y_data)
+    below_ticks = ticks[ticks <= y_min]
+    above_ticks = ticks[ticks >= y_max]
+    bottom_tick = (
+        below_ticks[-2]
+        if len(below_ticks) >= 2
+        else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
+    )
+    top_tick = (
+        above_ticks[1]
+        if len(above_ticks) >= 2
+        else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
+    )
+    visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
+
+    ax.set_ylim(bottom=bottom_tick, top=top_tick)
+    ax.set_yticks(visible_ticks)
+
+    plt.tight_layout(pad=0.1)
+
+    box = ax.get_position()
+    center_x = (box.x0 + box.x1) / 2
+    handles, labels = ax.get_legend_handles_labels()
+    legend_y = box.y1 + 0.02
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(center_x, legend_y),
+        ncol=2,
+        frameon=False,
+    )
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    pgf_path = _next_output_path("passage_query_paper", ".pgf")
 
     try:
         fig.savefig(pgf_path, format="pgf", bbox_inches="tight")
@@ -561,7 +971,13 @@ def main():
     parser.add_argument(
         "--plot",
         type=str,
-        choices=["temporal", "spatial", "spatio-temporal"],
+        choices=[
+            "temporal",
+            "spatial",
+            "spatio-temporal",
+            "thread-scalability",
+            "passage",
+        ],
         required=True,
         help="Which type of plot to generate.",
     )
@@ -586,13 +1002,15 @@ def main():
     if args.plot == "temporal":
         plot_temporal_range(data, thread_filter=args.threads, plot_type=args.type)
     elif args.plot == "spatial":
-        plot_spatial_range(
-            data, traffic=args.traffic, thread_filter=args.threads, plot_type=args.type
-        )
+        plot_spatial_range(data, thread_filter=args.threads, plot_type=args.type)
     elif args.plot == "spatio-temporal":
         plot_spatio_temporal_range(
             data, traffic=args.traffic, thread_filter=args.threads, plot_type=args.type
         )
+    elif args.plot == "thread-scalability":
+        plot_thread_scalability(data)
+    elif args.plot == "passage":
+        plot_passage_query(data, thread_filter=args.threads, plot_type=args.type)
 
 
 if __name__ == "__main__":

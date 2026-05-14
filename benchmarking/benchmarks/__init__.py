@@ -1,4 +1,7 @@
-from benchmarking.benchmarks.spatial_range_benchmark import SPATIAL_RANGE_BENCHMARKS
+from benchmarking.benchmarks.spatial_range_benchmark import (
+    SPATIAL_RANGE_BENCHMARKS,
+    SPATIAL_RANGE_NO_RTREE_BENCHMARKS,
+)
 from benchmarking.benchmarks.spatio_temporal_range_benchmark import (
     SPATIO_TEMPORAL_RANGE_BENCHMARKS,
 )
@@ -11,6 +14,7 @@ from benchmarking.benchmarks.spatio_temporal_join_benchmark import (
 RUN_PLAN = [
     *TEMPORAL_RANGE_BENCHMARKS,
     *SPATIAL_RANGE_BENCHMARKS,
+    *SPATIAL_RANGE_NO_RTREE_BENCHMARKS,
     *SPATIO_TEMPORAL_RANGE_BENCHMARKS,
     *PASSAGE_QUERY_BENCHMARKS,
 ]

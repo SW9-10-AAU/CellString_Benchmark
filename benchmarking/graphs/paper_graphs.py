@@ -119,6 +119,10 @@ SPATIAL_AREA_ORDER = ["1", "24", "435"]
 SPATIAL_RANGE_NAME_PATTERN = re.compile(
     r"^Spatial range query\s*-\s*(?:area|region)\s*(?P<region_id>\d+)$", re.IGNORECASE
 )
+SPATIAL_RANGE_NO_RTREE_NAME_PATTERN = re.compile(
+    r"^Spatial range query\s*\(no rtree\)\s*-\s*(?:area|region)\s*(?P<region_id>\d+)$",
+    re.IGNORECASE,
+)
 SPATIO_TEMPORAL_RANGE_NAME_PATTERN = re.compile(
     r"^Spatio-temporal range query - (?:area|region)\s*(?P<region_id>\d+)\s*\((?P<window>[^)]+)\)$",
     re.IGNORECASE,
@@ -300,6 +304,7 @@ def plot_spatial_range(
     data: Dict[str, Any],
     thread_filter: List[int] = None,
     plot_type: str = "bar",
+    include_no_rtree: bool = False,
 ) -> None:
     benchmarks = data.get("benchmarks", [])
     rows = []
@@ -312,9 +317,13 @@ def plot_spatial_range(
 
         name = str(bench.get("name") or "")
         match = SPATIAL_RANGE_NAME_PATTERN.match(name)
-        if not match:
+        match_no_rtree = SPATIAL_RANGE_NO_RTREE_NAME_PATTERN.match(name)
+        if not match and not match_no_rtree:
+            continue
+        if match_no_rtree and not include_no_rtree:
             continue
 
+        match = match or match_no_rtree
         area_id = int(match.group("region_id"))
         area_info = SPATIAL_AREA_GROUPS.get(area_id)
         if area_info is None:
@@ -333,15 +342,24 @@ def plot_spatial_range(
         traffic_suffix = traffic_labels[traffic_class]
 
         if st_exec is not None:
-            rows.append(
-                {
-                    "area": area_label,
-                    "series": f"{LINESTRING_SERIES} ({traffic_suffix})",
-                    "exec_ms": float(st_exec),
-                }
-            )
+            if match_no_rtree:
+                rows.append(
+                    {
+                        "area": area_label,
+                        "series": f"{LINESTRING_SERIES} (No R-tree, {traffic_suffix})",
+                        "exec_ms": float(st_exec),
+                    }
+                )
+            else:
+                rows.append(
+                    {
+                        "area": area_label,
+                        "series": f"{LINESTRING_SERIES} ({traffic_suffix})",
+                        "exec_ms": float(st_exec),
+                    }
+                )
 
-        if cst_exec is not None:
+        if cst_exec is not None and not match_no_rtree:
             rows.append(
                 {
                     "area": area_label,
@@ -360,25 +378,50 @@ def plot_spatial_range(
     series_order = [
         f"{LINESTRING_SERIES} (Low traffic)",
         f"{LINESTRING_SERIES} (High traffic)",
-        f"{CELLSTRING_SERIES} (Low traffic)",
-        f"{CELLSTRING_SERIES} (High traffic)",
     ]
+    if include_no_rtree:
+        series_order.extend(
+            [
+                f"{LINESTRING_SERIES} (No R-tree, Low traffic)",
+                f"{LINESTRING_SERIES} (No R-tree, High traffic)",
+            ]
+        )
+    series_order.extend(
+        [
+            f"{CELLSTRING_SERIES} (Low traffic)",
+            f"{CELLSTRING_SERIES} (High traffic)",
+        ]
+    )
     df["series"] = pd.Categorical(df["series"], categories=series_order, ordered=True)
 
     palette = {
-        series_order[0]: VIBRANT_COLORS[3],  # LS Low  -> 4th
-        series_order[1]: VIBRANT_COLORS[0],  # LS High -> 1st
-        series_order[2]: VIBRANT_COLORS[2],  # CS Low  -> 3rd
-        series_order[3]: VIBRANT_COLORS[1],  # CS High -> 2nd
+        f"{LINESTRING_SERIES} (Low traffic)": VIBRANT_COLORS[3],
+        f"{LINESTRING_SERIES} (High traffic)": VIBRANT_COLORS[0],
+        f"{CELLSTRING_SERIES} (Low traffic)": VIBRANT_COLORS[2],
+        f"{CELLSTRING_SERIES} (High traffic)": VIBRANT_COLORS[1],
     }
+    if include_no_rtree:
+        palette.update(
+            {
+                f"{LINESTRING_SERIES} (No R-tree, Low traffic)": VIBRANT_COLORS[5],
+                f"{LINESTRING_SERIES} (No R-tree, High traffic)": VIBRANT_COLORS[4],
+            }
+        )
 
     # Explicit marker assignment per series
     marker_map = {
-        series_order[0]: "s",  # LS Low  -> square
-        series_order[1]: "o",  # LS High -> circle
-        series_order[2]: "P",  # CS Low  -> plus
-        series_order[3]: "X",  # CS High -> x
+        f"{LINESTRING_SERIES} (Low traffic)": "s",
+        f"{LINESTRING_SERIES} (High traffic)": "o",
+        f"{CELLSTRING_SERIES} (Low traffic)": "P",
+        f"{CELLSTRING_SERIES} (High traffic)": "X",
     }
+    if include_no_rtree:
+        marker_map.update(
+            {
+                f"{LINESTRING_SERIES} (No R-tree, Low traffic)": "^",
+                f"{LINESTRING_SERIES} (No R-tree, High traffic)": "v",
+            }
+        )
 
     fig, ax = plt.subplots(figsize=(3.33, 2.2))
 
@@ -386,6 +429,8 @@ def plot_spatial_range(
         x_positions = list(range(len(SPATIAL_AREA_ORDER)))
         for series_name in series_order:
             subset = df[df["series"] == series_name].sort_values("area")
+            if subset.empty:
+                continue
             ax.plot(
                 x_positions,
                 subset["exec_ms"].values,
@@ -1029,6 +1074,11 @@ def main():
         help="Type of chart to generate (bar or line).",
     )
     parser.add_argument(
+        "--spatial-include-no-rtree",
+        action="store_true",
+        help="Include the LineString no-R-tree results in spatial range plots.",
+    )
+    parser.add_argument(
         "--thread-benchmark",
         type=str,
         choices=["temporal", "spatial", "spatio-temporal", "passage"],
@@ -1058,7 +1108,12 @@ def main():
     if args.plot == "temporal":
         plot_temporal_range(data, thread_filter=args.threads, plot_type=args.type)
     elif args.plot == "spatial":
-        plot_spatial_range(data, thread_filter=args.threads, plot_type=args.type)
+        plot_spatial_range(
+            data,
+            thread_filter=args.threads,
+            plot_type=args.type,
+            include_no_rtree=args.spatial_include_no_rtree,
+        )
     elif args.plot == "spatio-temporal":
         plot_spatio_temporal_range(
             data, traffic=args.traffic, thread_filter=args.threads, plot_type=args.type

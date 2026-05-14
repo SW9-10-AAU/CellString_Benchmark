@@ -392,7 +392,9 @@ def plot_spatial_range(
             f"{CELLSTRING_SERIES} (High traffic)",
         ]
     )
+
     df["series"] = pd.Categorical(df["series"], categories=series_order, ordered=True)
+    df = df.sort_values(["series", "area"])
 
     palette = {
         f"{LINESTRING_SERIES} (Low traffic)": VIBRANT_COLORS[3],
@@ -426,22 +428,24 @@ def plot_spatial_range(
     fig, ax = plt.subplots(figsize=(3.33, 2.2))
 
     if plot_type == "line":
-        x_positions = list(range(len(SPATIAL_AREA_ORDER)))
-        for series_name in series_order:
-            subset = df[df["series"] == series_name].sort_values("area")
-            if subset.empty:
-                continue
-            ax.plot(
-                x_positions,
-                subset["exec_ms"].values,
-                color=palette[series_name],
-                marker=marker_map[series_name],
-                label=series_name,
-                markersize=6,
-                linewidth=1.5,
-            )
-        ax.set_xticks(x_positions)
-        ax.set_xticklabels(SPATIAL_AREA_ORDER)
+        sns.lineplot(
+            data=df,
+            x="area",
+            y="exec_ms",
+            hue="series",
+            style="series",
+            hue_order=series_order,
+            style_order=series_order,
+            palette=palette,
+            markers=marker_map,
+            ax=ax,
+            dashes=False,
+            estimator=None,
+            units="series",
+            sort=False,
+            markersize=6,
+            linewidth=1.5,
+        )
     else:
         sns.barplot(
             data=df,

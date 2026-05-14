@@ -98,10 +98,13 @@ Parameter style for DuckDB is `?` (not `%s`).
 ```
 #### JSON
 - `benchmarking/benchmark_results/run_20260508_133426.json` is the latest run (05/08/2026) with all benchmarks (except ID Temporal), 1, 2, 4, 8, 16, 32, 64, and 120 threads, warm runs.
+- `benchmarking/benchmark_results/run_20260514_120035.json`
 ### Temporal range query bar charts
 `python -m benchmarking.graphs.paper_graphs --plot temporal --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
-### Spatial range query bar charts
+### Spatial range query bar charts with R-Tree
 `python -m benchmarking.graphs.paper_graphs --plot spatial --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
+### Spatial range query bar charts w/o R-Tree
+`python -m benchmarking.graphs.paper_graphs --plot spatial --type line --spatial-include-no-rtree --json benchmarking/benchmark_results/run_20260514_120035.json --threads 64`
 ### Spatio-temporal range query bar charts
 `python -m benchmarking.graphs.paper_graphs --plot spatio-temporal --traffic low --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Passage chart

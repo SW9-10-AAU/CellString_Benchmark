@@ -669,9 +669,12 @@ def plot_spatio_temporal_range(
 
 def plot_thread_scalability(
     data: Dict[str, Any],
-    region_id: int = 3,
+    benchmark_kind: str = "spatial",
+    region_id: int | None = 6,
+    window: str | None = None,
+    passage: str | None = None,
 ) -> None:
-    """Plot thread scalability for a specific spatial range region."""
+    """Plot thread scalability for a specific benchmark slice."""
     benchmarks = data.get("benchmarks", [])
     rows = []
 
@@ -680,13 +683,43 @@ def plot_thread_scalability(
             continue
 
         name = str(bench.get("name") or "")
-        match = SPATIAL_RANGE_NAME_PATTERN.match(name)
-        if not match:
-            continue
 
-        area_id = int(match.group("region_id"))
-        if area_id != region_id:
-            continue
+        if benchmark_kind == "spatial":
+            match = SPATIAL_RANGE_NAME_PATTERN.match(name)
+            if not match:
+                continue
+            area_id = int(match.group("region_id"))
+            if region_id is not None and area_id != region_id:
+                continue
+        elif benchmark_kind == "temporal":
+            match = TEMPORAL_RANGE_NAME_PATTERN.match(name)
+            if not match:
+                continue
+            window_key = match.group("window").strip().lower()
+            if window is not None and window_key != str(window).strip().lower():
+                continue
+        elif benchmark_kind == "spatio-temporal":
+            match = SPATIO_TEMPORAL_RANGE_NAME_PATTERN.match(name)
+            if not match:
+                continue
+            area_id = int(match.group("region_id"))
+            window_key = match.group("window").strip().lower()
+            if region_id is not None and area_id != region_id:
+                continue
+            if window is not None and window_key != str(window).strip().lower():
+                continue
+        elif benchmark_kind == "passage":
+            match = PASSAGE_QUERY_NAME_PATTERN.match(name)
+            if not match:
+                continue
+            crossings = _normalize_passage_key(match.group("crossings"))
+            passage_label = PASSAGE_NAME_MAP.get(crossings, crossings)
+            if passage is not None:
+                passage_key = passage.strip()
+                if passage_key not in {passage_label, crossings}:
+                    continue
+        else:
+            raise ValueError(f"Unsupported benchmark kind: {benchmark_kind}")
 
         thread_count = int(bench.get("thread_count") or 1)
 
@@ -713,7 +746,7 @@ def plot_thread_scalability(
             )
 
     if not rows:
-        print(f"No thread scalability data found for region {region_id}.")
+        print("No thread scalability data found for the selected filters.")
         return
 
     df = pd.DataFrame(rows)
@@ -796,7 +829,7 @@ def plot_thread_scalability(
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    pgf_path = _next_output_path("thread_scalability_paper", ".pgf")
+    pgf_path = _next_output_path(f"thread_scalability_{benchmark_kind}_paper", ".pgf")
 
     try:
         fig.savefig(pgf_path, format="pgf", bbox_inches="tight")
@@ -995,6 +1028,29 @@ def main():
         default="bar",
         help="Type of chart to generate (bar or line).",
     )
+    parser.add_argument(
+        "--thread-benchmark",
+        type=str,
+        choices=["temporal", "spatial", "spatio-temporal", "passage"],
+        default="spatial",
+        help="Benchmark kind to use for thread scalability plots.",
+    )
+    parser.add_argument(
+        "--region",
+        type=int,
+        default=6,
+        help="Region id filter for spatial/spatio-temporal thread scalability plots.",
+    )
+    parser.add_argument(
+        "--window",
+        type=str,
+        help="Time window filter for temporal/spatio-temporal thread scalability plots.",
+    )
+    parser.add_argument(
+        "--passage",
+        type=str,
+        help="Passage name or crossings string filter for passage thread scalability plots.",
+    )
     args = parser.parse_args()
 
     data = _load_report(args.json)
@@ -1008,7 +1064,13 @@ def main():
             data, traffic=args.traffic, thread_filter=args.threads, plot_type=args.type
         )
     elif args.plot == "thread-scalability":
-        plot_thread_scalability(data)
+        plot_thread_scalability(
+            data,
+            benchmark_kind=args.thread_benchmark,
+            region_id=args.region,
+            window=args.window,
+            passage=args.passage,
+        )
     elif args.plot == "passage":
         plot_passage_query(data, thread_filter=args.threads, plot_type=args.type)
 

@@ -137,6 +137,10 @@ PASSAGE_NAME_MAP = {
     "Kiel,Kadetrenden,Bornholms Gate": "The Kieler Kanal",
 }
 PASSAGE_ORDER = ["The Great Belt", "The Sound", "The Kieler Kanal"]
+COVERAGE_MMSI_NAME_PATTERN = re.compile(
+    r"^CoverageByMMSI - region (?P<region_id>\d+)\s*\(zoom (?P<zoom>\d+)\)$",
+    re.IGNORECASE,
+)
 
 
 def _load_report(path: str) -> Dict[str, Any]:
@@ -1037,6 +1041,105 @@ def plot_passage_query(
         print(f"Notice: Could not save PGF file: {e}")
 
 
+def plot_coverage_mmsi(
+    data: Dict[str, Any],
+    thread_filter: List[int] = None,
+    plot_type: str = "line",
+) -> None:
+    benchmarks = data.get("benchmarks", [])
+    rows = []
+
+    for bench in benchmarks:
+        if bench.get("benchmark_type") != "time":
+            continue
+
+        name = str(bench.get("name") or "")
+        match = COVERAGE_MMSI_NAME_PATTERN.match(name)
+        if not match:
+            continue
+
+        thread_count = int(bench.get("thread_count") or 1)
+        if thread_filter and thread_count not in thread_filter:
+            continue
+
+        zoom = int(match.group("zoom"))
+
+        result = bench.get("result", {})
+        cst_exec = result.get("cst", {}).get("exec_ms_med")
+        if cst_exec is None:
+            continue
+
+        rows.append({"zoom": zoom, "exec_ms": float(cst_exec)})
+
+    if not rows:
+        print("No CoverageByMMSI benchmark data found.")
+        return
+
+    df = pd.DataFrame(rows)
+    df = df.groupby("zoom", as_index=False)["exec_ms"].median()
+    df = df.sort_values("zoom")
+
+    fig, ax = plt.subplots(figsize=(3.33, 2.2))
+
+    if plot_type == "bar":
+        sns.barplot(
+            data=df,
+            x="zoom",
+            y="exec_ms",
+            ax=ax,
+            edgecolor="black",
+            linewidth=0.5,
+        )
+    else:
+        sns.lineplot(
+            data=df,
+            x="zoom",
+            y="exec_ms",
+            ax=ax,
+            markers=True,
+            dashes=False,
+            markersize=6,
+            linewidth=1.5,
+        )
+
+    ax.set_ylabel("Execution median (ms)")
+    ax.set_xlabel("Zoom level")
+
+    ax.yaxis.set_minor_locator(plt.NullLocator())
+    ax.xaxis.set_minor_locator(plt.NullLocator())
+
+    ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
+    ax.set_axisbelow(True)
+
+    if ax.get_legend():
+        ax.get_legend().remove()
+
+    plt.tight_layout(pad=0.1)
+
+    box = ax.get_position()
+    center_x = (box.x0 + box.x1) / 2
+    handles, labels = ax.get_legend_handles_labels()
+    if handles and labels:
+        legend_y = box.y1 + 0.02
+        fig.legend(
+            handles,
+            labels,
+            loc="lower center",
+            bbox_to_anchor=(center_x, legend_y),
+            ncol=1,
+            frameon=False,
+        )
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    pgf_path = _next_output_path("coverage_mmsi_paper", ".pgf")
+
+    try:
+        fig.savefig(pgf_path, format="pgf", bbox_inches="tight")
+        print(f"Successfully saved to {pgf_path}")
+    except Exception as e:
+        print(f"Notice: Could not save PGF file: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate ACM Sigconf compliant graphs."
@@ -1059,6 +1162,7 @@ def main():
             "spatio-temporal",
             "thread-scalability",
             "passage",
+            "coverage-mmsi",
         ],
         required=True,
         help="Which type of plot to generate.",
@@ -1132,6 +1236,8 @@ def main():
         )
     elif args.plot == "passage":
         plot_passage_query(data, thread_filter=args.threads, plot_type=args.type)
+    elif args.plot == "coverage-mmsi":
+        plot_coverage_mmsi(data, thread_filter=args.threads, plot_type=args.type)
 
 
 if __name__ == "__main__":

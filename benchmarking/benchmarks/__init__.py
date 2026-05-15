@@ -10,6 +10,7 @@ from benchmarking.benchmarks.passage_query_benchmark import PASSAGE_QUERY_BENCHM
 from benchmarking.benchmarks.spatio_temporal_join_benchmark import (
     SPATIO_TEMPORAL_JOIN_BENCHMARKS,
 )
+from benchmarking.benchmarks.coverage_mmsi_benchmark import COVERAGE_MMSI_BENCHMARKS
 
 RUN_PLAN = [
     *TEMPORAL_RANGE_BENCHMARKS,
@@ -17,4 +18,5 @@ RUN_PLAN = [
     *SPATIAL_RANGE_NO_RTREE_BENCHMARKS,
     *SPATIO_TEMPORAL_RANGE_BENCHMARKS,
     *PASSAGE_QUERY_BENCHMARKS,
+    *COVERAGE_MMSI_BENCHMARKS,
 ]

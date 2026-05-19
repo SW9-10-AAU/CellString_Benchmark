@@ -100,13 +100,13 @@ Parameter style for DuckDB is `?` (not `%s`).
 - `benchmarking/benchmark_results/run_20260508_133426.json` is the latest run (05/08/2026) with all benchmarks (except ID Temporal, spatial range w/o r-tree, coverage_by_mmsi), 1, 2, 4, 8, 16, 32, 64, and 120 threads, warm runs.
 - `benchmarking/benchmark_results/run_20260514_120035.json` is the "no-RTree" spatial range run (64 threads), warm runs.
 - `benchmarking/benchmark_results/run_20260515_152400.json` is the coverage_mmsi_benchmark.py on zoom 13, 14, 15, 16, 17, 18, 19 (64 threads), warm runs.
-### Temporal range query bar charts
+### Temporal range query line charts
 `python -m benchmarking.graphs.paper_graphs --plot temporal --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
-### Spatial range query bar charts with R-Tree
+### Spatial range query line charts with R-Tree
 `python -m benchmarking.graphs.paper_graphs --plot spatial --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
-### Spatial range query bar charts w/o R-Tree
+### Spatial range query line charts w/o R-Tree
 `python -m benchmarking.graphs.paper_graphs --plot spatial --type line --spatial-include-no-rtree --json benchmarking/benchmark_results/run_20260514_120035.json --threads 64`
-### Spatio-temporal range query bar charts
+### Spatio-temporal range query line charts
 `python -m benchmarking.graphs.paper_graphs --plot spatio-temporal --traffic low --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Passage chart
 `python -m benchmarking.graphs.paper_graphs --plot passage --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`

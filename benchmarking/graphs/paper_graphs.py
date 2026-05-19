@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from matplotlib.ticker import ScalarFormatter
+from matplotlib.ticker import ScalarFormatter, FixedLocator, FixedFormatter
 
 # ── Global font size for all graph text ──────────────────────────────────────
 FONT_SIZE = 8
@@ -157,7 +157,7 @@ def plot_temporal_range(
     benchmarks = data.get("benchmarks", [])
     rows = []
 
-    window_order = ["1", "7", "30", "180"]
+    window_order = [1, 7, 30, 180]
 
     for bench in benchmarks:
         if bench.get("benchmark_type") != "time":
@@ -168,8 +168,12 @@ def plot_temporal_range(
         if not match:
             continue
 
-        window = match.group("window").strip().lower()
-        if window not in window_order:
+        window_raw = match.group("window").strip()
+        try:
+            window_value = int(window_raw)
+        except ValueError:
+            continue
+        if window_value not in window_order:
             continue
 
         thread_count = int(bench.get("thread_count") or 1)
@@ -183,7 +187,7 @@ def plot_temporal_range(
         if st_exec is not None:
             rows.append(
                 {
-                    "window": window,
+                    "window": window_value,
                     "series": LINESTRING_SERIES,
                     "exec_ms": float(st_exec),
                 }
@@ -192,7 +196,7 @@ def plot_temporal_range(
         if cst_exec is not None:
             rows.append(
                 {
-                    "window": window,
+                    "window": window_value,
                     "series": CELLSTRING_SERIES,
                     "exec_ms": float(cst_exec),
                 }
@@ -203,7 +207,7 @@ def plot_temporal_range(
         return
 
     df = pd.DataFrame(rows)
-    df["window"] = pd.Categorical(df["window"], categories=window_order, ordered=True)
+    df = df.sort_values("window")
 
     # Half-column width = 3.33 inches
     fig, ax = plt.subplots(figsize=(3.33, 2.2))
@@ -232,8 +236,12 @@ def plot_temporal_range(
             linewidth=0.5,
         )
 
-    ax.set_ylabel("Execution median (ms)")
+    ax.set_ylabel("Execution time (ms)")
     ax.set_xlabel("Time window (day)")
+    ax.set_xscale("log")
+    ax.set_xlim(min(window_order) / 1.2, max(window_order) * 1.2)
+    ax.xaxis.set_major_locator(FixedLocator(window_order))
+    ax.xaxis.set_major_formatter(FixedFormatter([str(value) for value in window_order]))
 
     ax.set_yscale("log")
 
@@ -463,7 +471,7 @@ def plot_spatial_range(
             linewidth=0.5,
         )
 
-    ax.set_ylabel("Execution median (ms)")
+    ax.set_ylabel("Execution time (ms)")
     ax.set_xlabel(r"Area ($\mathrm{km}^2$)")
 
     ax.set_yscale("log")
@@ -650,7 +658,7 @@ def plot_spatio_temporal_range(
         if ax.get_legend():
             ax.get_legend().remove()
 
-    axes[0].set_ylabel("Execution median (ms)")
+    axes[0].set_ylabel("Execution time (ms)")
 
     # We wait to draw the legend until after tight_layout so it doesn't squish the subplots
 
@@ -824,7 +832,7 @@ def plot_thread_scalability(
         linewidth=1.5,
     )
 
-    ax.set_ylabel("Execution median (ms)")
+    ax.set_ylabel("Execution time (ms)")
     ax.set_xlabel("Threads")
 
     ax.set_yscale("log")
@@ -977,7 +985,7 @@ def plot_passage_query(
             linewidth=1.5,
         )
 
-    ax.set_ylabel("Execution median (ms)")
+    ax.set_ylabel("Execution time (ms)")
     ax.set_xlabel("Passage")
 
     ax.set_yscale("log")
@@ -1069,7 +1077,9 @@ def plot_coverage_mmsi(
         if cst_exec is None:
             continue
 
-        rows.append({"zoom": zoom, "exec_ms": float(cst_exec), "series": CELLSTRING_SERIES})
+        rows.append(
+            {"zoom": zoom, "exec_ms": float(cst_exec), "series": CELLSTRING_SERIES}
+        )
 
     if not rows:
         print("No CoverageByMMSI benchmark data found.")
@@ -1110,7 +1120,7 @@ def plot_coverage_mmsi(
             linewidth=1.5,
         )
 
-    ax.set_ylabel("Execution median (ms)")
+    ax.set_ylabel("Execution time (ms)")
     ax.set_xlabel("Zoom level")
 
     ax.yaxis.set_minor_locator(plt.NullLocator())

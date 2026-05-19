@@ -108,14 +108,14 @@ TEMPORAL_RANGE_NAME_PATTERN = re.compile(
 )
 
 SPATIAL_AREA_GROUPS = {
-    1: ("1", "high"),
-    2: ("24", "high"),
-    3: ("435", "high"),
-    4: ("1", "low"),
-    5: ("24", "low"),
-    6: ("435", "low"),
+    1: (1, "high"),
+    2: (24, "high"),
+    3: (435, "high"),
+    4: (1, "low"),
+    5: (24, "low"),
+    6: (435, "low"),
 }
-SPATIAL_AREA_ORDER = ["1", "24", "435"]
+SPATIAL_AREA_ORDER = [1, 24, 435]
 SPATIAL_RANGE_NAME_PATTERN = re.compile(
     r"^Spatial range query\s*-\s*(?:area|region)\s*(?P<region_id>\d+)$", re.IGNORECASE
 )
@@ -321,7 +321,7 @@ def plot_spatial_range(
     benchmarks = data.get("benchmarks", [])
     rows = []
 
-    traffic_labels = {"high": "High traffic", "low": "Low traffic"}
+    traffic_labels = {"high": "HT", "low": "LT"}
 
     for bench in benchmarks:
         if bench.get("benchmark_type") != "time":
@@ -388,20 +388,20 @@ def plot_spatial_range(
     df["area"] = pd.Categorical(df["area"], categories=SPATIAL_AREA_ORDER, ordered=True)
 
     series_order = [
-        f"{LINESTRING_SERIES} (Low traffic)",
-        f"{LINESTRING_SERIES} (High traffic)",
+        f"{LINESTRING_SERIES} (LT)",
+        f"{LINESTRING_SERIES} (HT)",
     ]
     if include_no_rtree:
         series_order.extend(
             [
-                f"{LINESTRING_SERIES} (No R-tree, Low traffic)",
-                f"{LINESTRING_SERIES} (No R-tree, High traffic)",
+                f"{LINESTRING_SERIES} (No R-tree, LT)",
+                f"{LINESTRING_SERIES} (No R-tree, HT)",
             ]
         )
     series_order.extend(
         [
-            f"{CELLSTRING_SERIES} (Low traffic)",
-            f"{CELLSTRING_SERIES} (High traffic)",
+            f"{CELLSTRING_SERIES} (LT)",
+            f"{CELLSTRING_SERIES} (HT)",
         ]
     )
 
@@ -409,31 +409,31 @@ def plot_spatial_range(
     df = df.sort_values(["series", "area"])
 
     palette = {
-        f"{LINESTRING_SERIES} (Low traffic)": VIBRANT_COLORS[3],
-        f"{LINESTRING_SERIES} (High traffic)": VIBRANT_COLORS[0],
-        f"{CELLSTRING_SERIES} (Low traffic)": VIBRANT_COLORS[2],
-        f"{CELLSTRING_SERIES} (High traffic)": VIBRANT_COLORS[1],
+        f"{LINESTRING_SERIES} (LT)": VIBRANT_COLORS[3],
+        f"{LINESTRING_SERIES} (HT)": VIBRANT_COLORS[0],
+        f"{CELLSTRING_SERIES} (LT)": VIBRANT_COLORS[2],
+        f"{CELLSTRING_SERIES} (HT)": VIBRANT_COLORS[1],
     }
     if include_no_rtree:
         palette.update(
             {
-                f"{LINESTRING_SERIES} (No R-tree, Low traffic)": VIBRANT_COLORS[5],
-                f"{LINESTRING_SERIES} (No R-tree, High traffic)": VIBRANT_COLORS[4],
+                f"{LINESTRING_SERIES} (No R-tree, LT)": VIBRANT_COLORS[5],
+                f"{LINESTRING_SERIES} (No R-tree, HT)": VIBRANT_COLORS[4],
             }
         )
 
     # Explicit marker assignment per series
     marker_map = {
-        f"{LINESTRING_SERIES} (Low traffic)": "s",
-        f"{LINESTRING_SERIES} (High traffic)": "o",
-        f"{CELLSTRING_SERIES} (Low traffic)": "P",
-        f"{CELLSTRING_SERIES} (High traffic)": "X",
+        f"{LINESTRING_SERIES} (LT)": "s",
+        f"{LINESTRING_SERIES} (HT)": "o",
+        f"{CELLSTRING_SERIES} (LT)": "P",
+        f"{CELLSTRING_SERIES} (HT)": "X",
     }
     if include_no_rtree:
         marker_map.update(
             {
-                f"{LINESTRING_SERIES} (No R-tree, Low traffic)": "^",
-                f"{LINESTRING_SERIES} (No R-tree, High traffic)": "v",
+                f"{LINESTRING_SERIES} (No R-tree, LT)": "^",
+                f"{LINESTRING_SERIES} (No R-tree, HT)": "v",
             }
         )
 
@@ -473,6 +473,12 @@ def plot_spatial_range(
 
     ax.set_ylabel("Execution time (ms)")
     ax.set_xlabel(r"Area ($\mathrm{km}^2$)")
+    ax.set_xscale("log")
+    ax.set_xlim(min(SPATIAL_AREA_ORDER) / 1.2, max(SPATIAL_AREA_ORDER) * 1.2)
+    ax.xaxis.set_major_locator(FixedLocator(SPATIAL_AREA_ORDER))
+    ax.xaxis.set_major_formatter(
+        FixedFormatter([str(value) for value in SPATIAL_AREA_ORDER])
+    )
 
     ax.set_yscale("log")
 
@@ -497,13 +503,13 @@ def plot_spatial_range(
     below_ticks = ticks[ticks <= y_min]
     above_ticks = ticks[ticks >= y_max]
     bottom_tick = (
-        below_ticks[-2]
-        if len(below_ticks) >= 2
+        below_ticks[-1]
+        if len(below_ticks) >= 1
         else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
     )
     top_tick = (
-        above_ticks[1]
-        if len(above_ticks) >= 2
+        above_ticks[0]
+        if len(above_ticks) >= 1
         else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
     )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]

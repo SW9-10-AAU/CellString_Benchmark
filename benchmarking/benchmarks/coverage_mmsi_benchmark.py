@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import List
 
 from benchmarking.core import TimeBenchmark
-from benchmarking.table_config import REGION_CS_TABLE, STOP_CS_TABLE, TRAJECTORY_CS_TABLE
+from benchmarking.table_config import (
+    REGION_CS_TABLE,
+    STOP_CS_TABLE,
+    TRAJECTORY_CS_TABLE,
+)
 
 ST_SQL = """
 SELECT NULL WHERE FALSE;
@@ -49,11 +53,10 @@ def build_coverage_mmsi_benchmark(region_id: int, zoom: int) -> TimeBenchmark:
     )
 
 
-COVERAGE_MMSI_ZOOMS: List[int] = [13, 14, 14, 15, 16, 17, 18, 19, 20, 21]
+COVERAGE_MMSI_ZOOMS: List[int] = [13, 14, 15, 16, 17, 18, 19]
 COVERAGE_MMSI_REGION_ID = 7
 
 COVERAGE_MMSI_BENCHMARKS: List[TimeBenchmark] = [
     build_coverage_mmsi_benchmark(COVERAGE_MMSI_REGION_ID, zoom)
     for zoom in COVERAGE_MMSI_ZOOMS
 ]
-

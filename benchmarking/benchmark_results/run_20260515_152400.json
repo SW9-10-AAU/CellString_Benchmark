@@ -1,0 +1,205 @@
+{
+  "meta": {
+    "run_started_at": "2026-05-15T15:24:00.542892+00:00",
+    "run_label": "server",
+    "cache_state": "warm",
+    "db_backend": "duckdb",
+    "duckdb_path": "/home/ubuntu/duckdb_data/cellstring.duckdb",
+    "linestring_schema": "p10_ls",
+    "cellstring_schema": "p10_cs",
+    "thread_plan": [
+      64
+    ],
+    "trajectory_count": 0,
+    "trajectory_ids": [],
+    "trajectory_cardinalities": {},
+    "trajectory_lengths": {},
+    "stop_count": 0,
+    "stop_ids": [],
+    "cold_run_note": "For cold runs on Linux: sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches"
+  },
+  "benchmarks": [
+    {
+      "name": "CoverageByMMSI - region 7 (zoom 13)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "CS_CoverageByMMSI",
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.452
+        },
+        "cst": {
+          "exec_ms_med": 4880.793
+        },
+        "false_positives": 8693,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 8693
+        }
+      }
+    },
+    {
+      "name": "CoverageByMMSI - region 7 (zoom 14)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "CS_CoverageByMMSI",
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.425
+        },
+        "cst": {
+          "exec_ms_med": 5051.266
+        },
+        "false_positives": 8667,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 8667
+        }
+      }
+    },
+    {
+      "name": "CoverageByMMSI - region 7 (zoom 15)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "CS_CoverageByMMSI",
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.44
+        },
+        "cst": {
+          "exec_ms_med": 6362.755
+        },
+        "false_positives": 8648,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 8648
+        }
+      }
+    },
+    {
+      "name": "CoverageByMMSI - region 7 (zoom 16)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "CS_CoverageByMMSI",
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.651
+        },
+        "cst": {
+          "exec_ms_med": 8954.416
+        },
+        "false_positives": 8635,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 8635
+        }
+      }
+    },
+    {
+      "name": "CoverageByMMSI - region 7 (zoom 17)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "CS_CoverageByMMSI",
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.418
+        },
+        "cst": {
+          "exec_ms_med": 13999.859
+        },
+        "false_positives": 8614,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 8614
+        }
+      }
+    },
+    {
+      "name": "CoverageByMMSI - region 7 (zoom 18)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "CS_CoverageByMMSI",
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.41
+        },
+        "cst": {
+          "exec_ms_med": 26292.878
+        },
+        "false_positives": 8603,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 8603
+        }
+      }
+    },
+    {
+      "name": "CoverageByMMSI - region 7 (zoom 19)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "CS_CoverageByMMSI",
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.418
+        },
+        "cst": {
+          "exec_ms_med": 58932.801
+        },
+        "false_positives": 8593,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 8593
+        }
+      }
+    }
+  ]
+}

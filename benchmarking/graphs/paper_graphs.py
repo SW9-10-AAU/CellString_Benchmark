@@ -783,13 +783,14 @@ def plot_spatio_temporal_range(
 def plot_thread_scalability(
     data: Dict[str, Any],
     benchmark_kind: str = "spatial",
-    region_id: int | None = 6,
+    region_id: List[int] | None = None,
     window: str | None = None,
     passage: str | None = None,
 ) -> None:
     """Plot thread scalability for a specific benchmark slice."""
     benchmarks = data.get("benchmarks", [])
     rows = []
+    region_ids = set(region_id) if region_id else None
 
     for bench in benchmarks:
         if bench.get("benchmark_type") != "time":
@@ -802,7 +803,10 @@ def plot_thread_scalability(
             if not match:
                 continue
             area_id = int(match.group("region_id"))
-            if region_id is not None and area_id != region_id:
+            if region_ids is not None and area_id not in region_ids:
+                continue
+            area_label, _traffic_class = SPATIAL_AREA_GROUPS.get(area_id, (None, None))
+            if area_label is None:
                 continue
         elif benchmark_kind == "temporal":
             match = TEMPORAL_RANGE_NAME_PATTERN.match(name)
@@ -811,15 +815,19 @@ def plot_thread_scalability(
             window_key = match.group("window").strip().lower()
             if window is not None and window_key != str(window).strip().lower():
                 continue
+            area_label = None
         elif benchmark_kind == "spatio-temporal":
             match = SPATIO_TEMPORAL_RANGE_NAME_PATTERN.match(name)
             if not match:
                 continue
             area_id = int(match.group("region_id"))
             window_key = match.group("window").strip().lower()
-            if region_id is not None and area_id != region_id:
+            if region_ids is not None and area_id not in region_ids:
                 continue
             if window is not None and window_key != str(window).strip().lower():
+                continue
+            area_label, _traffic_class = SPATIAL_AREA_GROUPS.get(area_id, (None, None))
+            if area_label is None:
                 continue
         elif benchmark_kind == "passage":
             match = PASSAGE_QUERY_NAME_PATTERN.match(name)
@@ -831,6 +839,7 @@ def plot_thread_scalability(
                 passage_key = passage.strip()
                 if passage_key not in {passage_label, crossings}:
                     continue
+            area_label = None
         else:
             raise ValueError(f"Unsupported benchmark kind: {benchmark_kind}")
 
@@ -845,6 +854,7 @@ def plot_thread_scalability(
                 {
                     "threads": thread_count,
                     "series": LINESTRING_SERIES,
+                    "area_km2": area_label,
                     "exec_ms": float(st_exec),
                 }
             )
@@ -854,6 +864,7 @@ def plot_thread_scalability(
                 {
                     "threads": thread_count,
                     "series": CELLSTRING_SERIES,
+                    "area_km2": area_label,
                     "exec_ms": float(cst_exec),
                 }
             )
@@ -865,9 +876,55 @@ def plot_thread_scalability(
     df = pd.DataFrame(rows)
     df = df.sort_values("threads")
 
-    thread_order = [str(t) for t in sorted(df["threads"].unique())]
-    df["threads"] = df["threads"].astype(str)
-    df["threads"] = pd.Categorical(df["threads"], categories=thread_order, ordered=True)
+    df["threads"] = pd.to_numeric(df["threads"], errors="coerce")
+    df = df.dropna(subset=["threads"])
+
+    if benchmark_kind in {"spatial", "spatio-temporal"}:
+        df["area_km2"] = pd.to_numeric(df["area_km2"], errors="coerce")
+        df = df.dropna(subset=["area_km2"])
+        df["series_label"] = df.apply(
+            lambda row: (
+                f"{row['series']} ({int(row['area_km2'])} $\\mathrm{{km}}^2$)"
+            ),
+            axis=1,
+        )
+
+        area_sizes = sorted(df["area_km2"].unique())
+        series_order = []
+        for base in [LINESTRING_SERIES, CELLSTRING_SERIES]:
+            for area in area_sizes:
+                series_order.append(f"{base} ({int(area)} $\\mathrm{{km}}^2$)")
+
+        palette = {}
+        marker_map = {}
+        base_colors = {
+            LINESTRING_SERIES: VIBRANT_COLORS[0],
+            CELLSTRING_SERIES: VIBRANT_COLORS[1],
+        }
+        alt_colors = {
+            LINESTRING_SERIES: VIBRANT_COLORS[3],
+            CELLSTRING_SERIES: VIBRANT_COLORS[2],
+        }
+        base_markers = {LINESTRING_SERIES: "o", CELLSTRING_SERIES: "X"}
+        alt_markers = {LINESTRING_SERIES: "s", CELLSTRING_SERIES: "P"}
+
+        for label in series_order:
+            base_name, area_text = label.split(" (", 1)
+            area_match = re.search(r"\d+", area_text)
+            area_value = float(area_match.group(0)) if area_match else 0
+            if area_value == 435:
+                palette[label] = base_colors.get(base_name, VIBRANT_COLORS[0])
+                marker_map[label] = base_markers.get(base_name, "o")
+            else:
+                palette[label] = alt_colors.get(base_name, VIBRANT_COLORS[3])
+                marker_map[label] = alt_markers.get(base_name, "s")
+    else:
+        df["series_label"] = df["series"]
+        series_order = [LINESTRING_SERIES, CELLSTRING_SERIES]
+        palette = None
+        marker_map = None
+
+    thread_order = sorted(df["threads"].unique())
 
     fig, ax = plt.subplots(figsize=(3.33, 2.2))
 
@@ -875,10 +932,13 @@ def plot_thread_scalability(
         data=df,
         x="threads",
         y="exec_ms",
-        hue="series",
-        style="series",
+        hue="series_label",
+        style="series_label",
+        hue_order=series_order,
+        style_order=series_order,
+        palette=palette,
+        markers=marker_map,
         ax=ax,
-        markers=True,
         dashes=False,
         markersize=6,
         linewidth=1.5,
@@ -886,6 +946,11 @@ def plot_thread_scalability(
 
     ax.set_ylabel("Execution time (ms)")
     ax.set_xlabel("Threads")
+
+    ax.set_xscale("log")
+    ax.set_xlim(min(thread_order) / 1.2, max(thread_order) * 1.2)
+    ax.xaxis.set_major_locator(FixedLocator(thread_order))
+    ax.xaxis.set_major_formatter(FixedFormatter([str(tick) for tick in thread_order]))
 
     ax.set_yscale("log")
 
@@ -911,13 +976,13 @@ def plot_thread_scalability(
     below_ticks = ticks[ticks <= y_min]
     above_ticks = ticks[ticks >= y_max]
     bottom_tick = (
-        below_ticks[-2]
-        if len(below_ticks) >= 2
+        below_ticks[-1]
+        if len(below_ticks) >= 1
         else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
     )
     top_tick = (
-        above_ticks[1]
-        if len(above_ticks) >= 2
+        above_ticks[0]
+        if len(above_ticks) >= 1
         else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
     )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
@@ -931,10 +996,13 @@ def plot_thread_scalability(
     box = ax.get_position()
     center_x = (box.x0 + box.x1) / 2
     handles, labels = ax.get_legend_handles_labels()
+    handle_map = {label: handle for handle, label in zip(handles, labels)}
+    ordered_labels = [label for label in series_order if label in handle_map]
+    ordered_handles = [handle_map[label] for label in ordered_labels]
     legend_y = box.y1 + 0.02
     fig.legend(
-        handles,
-        labels,
+        ordered_handles,
+        ordered_labels,
         loc="lower center",
         bbox_to_anchor=(center_x, legend_y),
         ncol=2,
@@ -1266,7 +1334,8 @@ def main():
     parser.add_argument(
         "--region",
         type=int,
-        default=6,
+        nargs="+",
+        default=[6],
         help="Region id filter for spatial/spatio-temporal thread scalability plots.",
     )
     parser.add_argument(

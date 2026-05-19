@@ -111,6 +111,9 @@ Parameter style for DuckDB is `?` (not `%s`).
 ### Passage chart
 `python -m benchmarking.graphs.paper_graphs --plot passage --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Thread scaling line charts
+#### Spatial thread scaling line (region 2 and 3)
+`python -m benchmarking.graphs.paper_graphs --plot thread-scalability --thread-benchmark spatial --region 2 3 --type line --json benchmarking/benchmark_results/run_20260508_133426.json `
+#### Spatio-temporal thread scaling (region 3, window 30)
 `python -m benchmarking.graphs.paper_graphs --plot thread-scalability --thread-benchmark spatio-temporal --region 3 --window 30 --json benchmarking/benchmark_results/run_20260508_133426.json`
 ### Coverage by MMSI line chart
 `python -m benchmarking.graphs.paper_graphs --plot coverage-mmsi --type line --json benchmarking/benchmark_results/run_20260515_152400.json`

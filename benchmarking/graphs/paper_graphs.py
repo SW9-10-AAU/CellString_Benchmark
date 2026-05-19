@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from matplotlib.ticker import ScalarFormatter, FixedLocator, FixedFormatter
+from matplotlib.ticker import ScalarFormatter, FixedLocator, FixedFormatter, LogLocator
 
 # ── Global font size for all graph text ──────────────────────────────────────
 FONT_SIZE = 8
@@ -546,12 +546,32 @@ def plot_spatial_range(
 
 def plot_spatio_temporal_range(
     data: Dict[str, Any],
-    traffic: str = "high",
+    traffic: str = "both",
     thread_filter: List[int] = None,
     plot_type: str = "bar",
 ) -> None:
     benchmarks = data.get("benchmarks", [])
     rows = []
+
+    traffic_labels = {"high": "HT", "low": "LT"}
+    series_order = [
+        f"{LINESTRING_SERIES} (LT)",
+        f"{LINESTRING_SERIES} (HT)",
+        f"{CELLSTRING_SERIES} (LT)",
+        f"{CELLSTRING_SERIES} (HT)",
+    ]
+    palette = {
+        f"{LINESTRING_SERIES} (LT)": VIBRANT_COLORS[3],
+        f"{LINESTRING_SERIES} (HT)": VIBRANT_COLORS[0],
+        f"{CELLSTRING_SERIES} (LT)": VIBRANT_COLORS[2],
+        f"{CELLSTRING_SERIES} (HT)": VIBRANT_COLORS[1],
+    }
+    marker_map = {
+        f"{LINESTRING_SERIES} (LT)": "s",
+        f"{LINESTRING_SERIES} (HT)": "o",
+        f"{CELLSTRING_SERIES} (LT)": "P",
+        f"{CELLSTRING_SERIES} (HT)": "X",
+    }
 
     for bench in benchmarks:
         if bench.get("benchmark_type") != "time":
@@ -570,7 +590,7 @@ def plot_spatio_temporal_range(
             continue
 
         area_label, traffic_class = area_info
-        if traffic_class != traffic:
+        if traffic != "both" and traffic_class != traffic:
             continue
 
         thread_count = int(bench.get("thread_count") or 1)
@@ -584,12 +604,14 @@ def plot_spatio_temporal_range(
         st_exec = result.get("st", {}).get("exec_ms_med")
         cst_exec = result.get("cst", {}).get("exec_ms_med")
 
+        traffic_suffix = traffic_labels[traffic_class]
+
         if st_exec is not None:
             rows.append(
                 {
                     "window": window,
                     "area_short": area_short,
-                    "series": LINESTRING_SERIES,
+                    "series": f"{LINESTRING_SERIES} ({traffic_suffix})",
                     "exec_ms": float(st_exec),
                 }
             )
@@ -599,23 +621,27 @@ def plot_spatio_temporal_range(
                 {
                     "window": window,
                     "area_short": area_short,
-                    "series": CELLSTRING_SERIES,
+                    "series": f"{CELLSTRING_SERIES} ({traffic_suffix})",
                     "exec_ms": float(cst_exec),
                 }
             )
 
     if not rows:
-        print(f"No spatio-temporal range benchmark data found for {traffic} traffic.")
+        if traffic == "both":
+            print("No spatio-temporal range benchmark data found.")
+        else:
+            print(
+                f"No spatio-temporal range benchmark data found for {traffic} traffic."
+            )
         return
 
     df = pd.DataFrame(rows)
     window_order = ["1", "7", "30", "180"]
-    area_order_short = SPATIAL_AREA_ORDER
+    area_ticks = SPATIAL_AREA_ORDER
+    x_padding_factor = 2
 
     df["window"] = pd.Categorical(df["window"], categories=window_order, ordered=True)
-    df["area_short"] = pd.Categorical(
-        df["area_short"], categories=area_order_short, ordered=True
-    )
+    df = df.sort_values(["window", "area_short", "series"])
 
     fig, axes = plt.subplots(1, len(window_order), figsize=(3.33, 2.2), sharey=True)
 
@@ -631,8 +657,12 @@ def plot_spatio_temporal_range(
                     y="exec_ms",
                     hue="series",
                     style="series",
+                    hue_order=series_order,
+                    style_order=series_order,
+                    palette=palette,
+                    markers=marker_map,
                     ax=ax,
-                    markers=True,
+                    # markers=True,
                     dashes=False,
                     markersize=6,
                     linewidth=1.5,
@@ -643,6 +673,8 @@ def plot_spatio_temporal_range(
                     x="area_short",
                     y="exec_ms",
                     hue="series",
+                    hue_order=series_order,
+                    palette=palette,
                     ax=ax,
                     edgecolor="black",
                     linewidth=0.5,
@@ -651,7 +683,14 @@ def plot_spatio_temporal_range(
         ax.set_title(window, fontsize=FONT_SIZE)
         ax.set_xlabel("")
         plt.setp(ax.get_xticklabels(), rotation=0, ha="center", fontsize=FONT_SIZE)
-        ax.set_xlim(-0.3, len(area_order_short) - 1 + 0.3)
+        ax.set_xscale("log")
+        ax.set_xlim(
+            min(area_ticks) / x_padding_factor, max(area_ticks) * x_padding_factor
+        )
+        ax.xaxis.set_major_locator(FixedLocator(area_ticks))
+        ax.xaxis.set_major_formatter(
+            FixedFormatter([str(value) for value in area_ticks])
+        )
         ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
         ax.set_axisbelow(True)
         ax.set_yscale("log")
@@ -672,16 +711,24 @@ def plot_spatio_temporal_range(
     base_ticks = [1, 2.5, 5, 7.5]
     ticks = np.array([b * (10**p) for p in range(0, 6) for b in base_ticks])
     y_min, y_max = np.min(y_data), np.max(y_data)
+    # Use one tick BELOW the lowest and one ABOVE the highest for buffer
+    below_ticks = ticks[ticks <= y_min]
+    above_ticks = ticks[ticks >= y_max]
     bottom_tick = (
-        ticks[ticks <= y_min][-1] if len(ticks[ticks <= y_min]) > 0 else y_min * 0.9
+        below_ticks[-1]
+        if len(below_ticks) >= 1
+        else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
     )
     top_tick = (
-        ticks[ticks >= y_max][0] if len(ticks[ticks >= y_max]) > 0 else y_max * 1.1
+        above_ticks[0]
+        if len(above_ticks) >= 1
+        else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
     )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
 
     axes[0].set_ylim(bottom=bottom_tick, top=top_tick)
     axes[0].set_yticks(visible_ticks)
+    axes[0].yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.5, 5.0, 7.5)))
 
     plt.tight_layout(pad=0.1)
     fig.subplots_adjust(wspace=0, bottom=0.16)
@@ -700,7 +747,6 @@ def plot_spatio_temporal_range(
         va="center",
         fontsize=FONT_SIZE,
     )
-
     # Draw centered top X-axis label above the subplots (dynamically spaced above the axes)
     days_y = box0.y1 + 0.08
     fig.text(
@@ -1015,13 +1061,13 @@ def plot_passage_query(
     below_ticks = ticks[ticks <= y_min]
     above_ticks = ticks[ticks >= y_max]
     bottom_tick = (
-        below_ticks[-2]
-        if len(below_ticks) >= 2
+        below_ticks[-1]
+        if len(below_ticks) >= 1
         else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
     )
     top_tick = (
-        above_ticks[1]
-        if len(above_ticks) >= 2
+        above_ticks[0]
+        if len(above_ticks) >= 1
         else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
     )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]
@@ -1194,8 +1240,8 @@ def main():
     parser.add_argument(
         "--traffic",
         type=str,
-        choices=["high", "low"],
-        default="high",
+        choices=["high", "low", "both"],
+        default="both",
         help="Traffic level to plot (only applies to spatial and spatio-temporal range).",
     )
     parser.add_argument(

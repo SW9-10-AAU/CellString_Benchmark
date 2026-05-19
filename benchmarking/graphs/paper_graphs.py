@@ -1069,23 +1069,28 @@ def plot_coverage_mmsi(
         if cst_exec is None:
             continue
 
-        rows.append({"zoom": zoom, "exec_ms": float(cst_exec)})
+        rows.append({"zoom": zoom, "exec_ms": float(cst_exec), "series": CELLSTRING_SERIES})
 
     if not rows:
         print("No CoverageByMMSI benchmark data found.")
         return
 
     df = pd.DataFrame(rows)
-    df = df.groupby("zoom", as_index=False)["exec_ms"].median()
+    df = df.groupby(["zoom", "series"], as_index=False)["exec_ms"].median()
     df = df.sort_values("zoom")
 
     fig, ax = plt.subplots(figsize=(3.33, 2.2))
+
+    palette = {CELLSTRING_SERIES: VIBRANT_COLORS[1]}
+    marker_map = {CELLSTRING_SERIES: "X"}
 
     if plot_type == "bar":
         sns.barplot(
             data=df,
             x="zoom",
             y="exec_ms",
+            hue="series",
+            palette=palette,
             ax=ax,
             edgecolor="black",
             linewidth=0.5,
@@ -1095,8 +1100,11 @@ def plot_coverage_mmsi(
             data=df,
             x="zoom",
             y="exec_ms",
+            hue="series",
+            style="series",
+            palette=palette,
+            markers=marker_map,
             ax=ax,
-            markers=True,
             dashes=False,
             markersize=6,
             linewidth=1.5,

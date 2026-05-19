@@ -97,8 +97,9 @@ Parameter style for DuckDB is `?` (not `%s`).
 --passage PASSAGE     Passage name or crossings string filter for passage thread scalability plots.
 ```
 #### JSON
-- `benchmarking/benchmark_results/run_20260508_133426.json` is the latest run (05/08/2026) with all benchmarks (except ID Temporal), 1, 2, 4, 8, 16, 32, 64, and 120 threads, warm runs.
-- `benchmarking/benchmark_results/run_20260514_120035.json`
+- `benchmarking/benchmark_results/run_20260508_133426.json` is the latest run (05/08/2026) with all benchmarks (except ID Temporal, spatial range w/o r-tree, coverage_by_mmsi), 1, 2, 4, 8, 16, 32, 64, and 120 threads, warm runs.
+- `benchmarking/benchmark_results/run_20260514_120035.json` is the "no-RTree" spatial range run (64 threads), warm runs.
+- `benchmarking/benchmark_results/run_20260515_152400.json` is the coverage_mmsi_benchmark.py on zoom 13, 14, 15, 16, 17, 18, 19 (64 threads), warm runs.
 ### Temporal range query bar charts
 `python -m benchmarking.graphs.paper_graphs --plot temporal --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Spatial range query bar charts with R-Tree
@@ -111,7 +112,8 @@ Parameter style for DuckDB is `?` (not `%s`).
 `python -m benchmarking.graphs.paper_graphs --plot passage --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Thread scaling line charts
 `python -m benchmarking.graphs.paper_graphs --plot thread-scalability --thread-benchmark spatio-temporal --region 3 --window 30 --json benchmarking/benchmark_results/run_20260508_133426.json`
-
+### Coverage by MMSI line chart
+`python -m benchmarking.graphs.paper_graphs --plot coverage-mmsi --type line --json benchmarking/benchmark_results/run_20260515_152400.json`
 ## ~~Graphs~~ - DEPRECATED
 
 Set `DEFAULT_REPORT_JSON` in `benchmarking/graphs/graph_generation.py` if you want a fixed JSON file without passing it on the command line. Leave it as `None` to auto-pick the newest report.

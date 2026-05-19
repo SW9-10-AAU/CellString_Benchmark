@@ -114,10 +114,10 @@ def build_spatial_range_no_rtree_benchmark(region_id: int) -> TimeBenchmark:
 
 
 SPATIAL_RANGE_BENCHMARKS = [
-    build_spatial_range_benchmark(region_id) for region_id in (1, 2, 3, 4, 5, 6)
+    build_spatial_range_benchmark(region_id) for region_id in (1, 2, 7, 3, 4, 5, 8, 6)
 ]
 
 SPATIAL_RANGE_NO_RTREE_BENCHMARKS = [
-    build_spatial_range_no_rtree_benchmark(region_id) for region_id in (1, 2, 3, 4, 5, 6)
+    build_spatial_range_no_rtree_benchmark(region_id)
+    for region_id in (1, 2, 7, 3, 4, 5, 8, 6)
 ]
-

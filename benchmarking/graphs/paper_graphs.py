@@ -269,13 +269,13 @@ def plot_temporal_range(
     below_ticks = ticks[ticks <= y_min]
     above_ticks = ticks[ticks >= y_max]
     bottom_tick = (
-        below_ticks[-2]
-        if len(below_ticks) >= 2
+        below_ticks[-1]
+        if len(below_ticks) >= 1
         else (below_ticks[-1] if len(below_ticks) > 0 else y_min * 0.9)
     )
     top_tick = (
-        above_ticks[1]
-        if len(above_ticks) >= 2
+        above_ticks[0]
+        if len(above_ticks) >= 1
         else (above_ticks[0] if len(above_ticks) > 0 else y_max * 1.1)
     )
     visible_ticks = ticks[(ticks >= bottom_tick) & (ticks <= top_tick)]

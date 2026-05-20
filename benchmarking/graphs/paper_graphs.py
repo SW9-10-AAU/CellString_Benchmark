@@ -373,7 +373,7 @@ def plot_spatial_range(
                     }
                 )
 
-        if cst_exec is not None and not match_no_rtree:
+        if cst_exec is not None and not match_no_rtree and not include_no_rtree:
             rows.append(
                 {
                     "area": area_label,
@@ -400,12 +400,13 @@ def plot_spatial_range(
                 f"{LINESTRING_SERIES} (No R-tree, HT)",
             ]
         )
-    series_order.extend(
-        [
-            f"{CELLSTRING_SERIES} (LT)",
-            f"{CELLSTRING_SERIES} (HT)",
-        ]
-    )
+    else:
+        series_order.extend(
+            [
+                f"{CELLSTRING_SERIES} (LT)",
+                f"{CELLSTRING_SERIES} (HT)",
+            ]
+        )
 
     df["series"] = pd.Categorical(df["series"], categories=series_order, ordered=True)
     df = df.sort_values(["series", "area"])
@@ -413,8 +414,6 @@ def plot_spatial_range(
     palette = {
         f"{LINESTRING_SERIES} (LT)": VIBRANT_COLORS[3],
         f"{LINESTRING_SERIES} (HT)": VIBRANT_COLORS[0],
-        f"{CELLSTRING_SERIES} (LT)": VIBRANT_COLORS[2],
-        f"{CELLSTRING_SERIES} (HT)": VIBRANT_COLORS[1],
     }
     if include_no_rtree:
         palette.update(
@@ -423,19 +422,31 @@ def plot_spatial_range(
                 f"{LINESTRING_SERIES} (No R-tree, HT)": VIBRANT_COLORS[4],
             }
         )
+    else:
+        palette.update(
+            {
+                f"{CELLSTRING_SERIES} (LT)": VIBRANT_COLORS[2],
+                f"{CELLSTRING_SERIES} (HT)": VIBRANT_COLORS[1],
+            }
+        )
 
     # Explicit marker assignment per series
     marker_map = {
         f"{LINESTRING_SERIES} (LT)": "s",
         f"{LINESTRING_SERIES} (HT)": "o",
-        f"{CELLSTRING_SERIES} (LT)": "P",
-        f"{CELLSTRING_SERIES} (HT)": "X",
     }
     if include_no_rtree:
         marker_map.update(
             {
                 f"{LINESTRING_SERIES} (No R-tree, LT)": "^",
                 f"{LINESTRING_SERIES} (No R-tree, HT)": "v",
+            }
+        )
+    else:
+        marker_map.update(
+            {
+                f"{CELLSTRING_SERIES} (LT)": "P",
+                f"{CELLSTRING_SERIES} (HT)": "X",
             }
         )
 

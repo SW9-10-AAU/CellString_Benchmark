@@ -100,19 +100,21 @@ Parameter style for DuckDB is `?` (not `%s`).
 - `benchmarking/benchmark_results/run_20260508_133426.json` is the latest run (05/08/2026) with all benchmarks (except ID Temporal, spatial range w/o r-tree, coverage_by_mmsi), 1, 2, 4, 8, 16, 32, 64, and 120 threads, warm runs.
 - `benchmarking/benchmark_results/run_20260514_120035.json` is the "no-RTree" spatial range run (64 threads), warm runs.
 - `benchmarking/benchmark_results/run_20260515_152400.json` is the coverage_mmsi_benchmark.py on zoom 13, 14, 15, 16, 17, 18, 19 (64 threads), warm runs.
+- `benchmarking/benchmark_results/run_20260519_195550.json` is the coverage_mmsi_benchmark.py on zoom 19 run on 8, 16, 32, 64, 120 threads, warm runs.
+- `benchmarking/benchmark_results/run_20260520_074714.json` is the spatial range run with the new "medium-large" regions with and w/o R-Tree (64 threads), warm runs.
 ### Temporal range query line charts
 `python -m benchmarking.graphs.paper_graphs --plot temporal --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Spatial range query line charts with R-Tree
-`python -m benchmarking.graphs.paper_graphs --plot spatial --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
-### Spatial range query line charts w/o R-Tree
-`python -m benchmarking.graphs.paper_graphs --plot spatial --type line --spatial-include-no-rtree --json benchmarking/benchmark_results/run_20260514_120035.json --threads 64`
+`python -m benchmarking.graphs.paper_graphs --plot spatial --type line --json benchmarking/benchmark_results/run_20260520_074714.json --threads 64`
+### Spatial range query line charts with and w/o R-Tree
+`python -m benchmarking.graphs.paper_graphs --plot spatial --type line --spatial-include-no-rtree --json benchmarking/benchmark_results/run_20260520_074714.json --threads 64`
 ### Spatio-temporal range query line charts
 `python -m benchmarking.graphs.paper_graphs --plot spatio-temporal --traffic low --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Passage chart
 `python -m benchmarking.graphs.paper_graphs --plot passage --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Thread scaling line charts
 #### Spatial thread scaling line (region 2 and 3)
-`python -m benchmarking.graphs.paper_graphs --plot thread-scalability --thread-benchmark spatial --region 2 3 --type line --json benchmarking/benchmark_results/run_20260508_133426.json `
+`python -m benchmarking.graphs.paper_graphs --plot thread-scalability --thread-benchmark spatial --region 2 3 --type line --json benchmarking/benchmark_results/run_20260508_133426.json`
 #### Spatio-temporal thread scaling (region 3, window 30)
 `python -m benchmarking.graphs.paper_graphs --plot thread-scalability --thread-benchmark spatio-temporal --region 3 --window 30 --json benchmarking/benchmark_results/run_20260508_133426.json`
 ### Coverage by MMSI line chart

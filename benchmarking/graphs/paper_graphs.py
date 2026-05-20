@@ -114,8 +114,10 @@ SPATIAL_AREA_GROUPS = {
     4: (1, "low"),
     5: (24, "low"),
     6: (435, "low"),
+    7: (128, "high"),
+    8: (128, "low"),
 }
-SPATIAL_AREA_ORDER = [1, 24, 435]
+SPATIAL_AREA_ORDER = [1, 24, 128, 435]
 SPATIAL_RANGE_NAME_PATTERN = re.compile(
     r"^Spatial range query\s*-\s*(?:area|region)\s*(?P<region_id>\d+)$", re.IGNORECASE
 )

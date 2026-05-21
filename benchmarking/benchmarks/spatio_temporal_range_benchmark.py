@@ -113,18 +113,18 @@ def build_spatio_temporal_range_benchmark(
 SPATIO_TEMPORAL_RANGE_BENCHMARKS: List[TimeBenchmark] = (
     [
         build_spatio_temporal_range_benchmark("1", 1, region_id)
-        for region_id in (1, 2, 3, 4, 5, 6)
+        for region_id in (1, 2, 7, 3, 4, 5, 8, 6)
     ]
     + [
         build_spatio_temporal_range_benchmark("7", 7, region_id)
-        for region_id in (1, 2, 3, 4, 5, 6)
+        for region_id in (1, 2, 7, 3, 4, 5, 8, 6)
     ]
     + [
         build_spatio_temporal_range_benchmark("30", 30, region_id)
-        for region_id in (1, 2, 3, 4, 5, 6)
+        for region_id in (1, 2, 7, 3, 4, 5, 8, 6)
     ]
     + [
         build_spatio_temporal_range_benchmark("180", 180, region_id)
-        for region_id in (1, 2, 3, 4, 5, 6)
+        for region_id in (1, 2, 7, 3, 4, 5, 8, 6)
     ]
 )

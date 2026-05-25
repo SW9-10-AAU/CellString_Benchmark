@@ -12,6 +12,8 @@ from matplotlib.ticker import ScalarFormatter, FixedLocator, FixedFormatter, Log
 
 # ── Global font size for all graph text ──────────────────────────────────────
 FONT_SIZE = 8
+FIGSIZE_THREE_ACROSS = (2.2, 1.6)
+LEGEND_COLUMNSPACING = 0.1
 
 # Vibrant palette colors (Paul Tol)
 VIBRANT_COLORS = [
@@ -211,8 +213,8 @@ def plot_temporal_range(
     df = pd.DataFrame(rows)
     df = df.sort_values("window")
 
-    # Half-column width = 3.33 inches
-    fig, ax = plt.subplots(figsize=(3.33, 2.2))
+    # Three-across width for figure*
+    fig, ax = plt.subplots(figsize=FIGSIZE_THREE_ACROSS)
 
     if plot_type == "line":
         sns.lineplot(
@@ -299,6 +301,7 @@ def plot_temporal_range(
         bbox_to_anchor=(center_x, legend_y),
         ncol=2,
         frameon=False,
+        columnspacing=LEGEND_COLUMNSPACING,
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -450,7 +453,7 @@ def plot_spatial_range(
             }
         )
 
-    fig, ax = plt.subplots(figsize=(3.33, 2.2))
+    fig, ax = plt.subplots(figsize=FIGSIZE_THREE_ACROSS)
 
     if plot_type == "line":
         sns.lineplot(
@@ -544,6 +547,7 @@ def plot_spatial_range(
         bbox_to_anchor=(center_x, legend_y),
         ncol=2,
         frameon=False,
+        columnspacing=LEGEND_COLUMNSPACING,
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -650,13 +654,17 @@ def plot_spatio_temporal_range(
 
     df = pd.DataFrame(rows)
     window_order = ["1", "7", "30", "180"]
-    area_ticks = SPATIAL_AREA_ORDER
-    x_padding_factor = 2
+    area_ticks = [str(value) for value in SPATIAL_AREA_ORDER]
 
     df["window"] = pd.Categorical(df["window"], categories=window_order, ordered=True)
+    df["area_short"] = pd.Categorical(
+        df["area_short"].astype(str), categories=area_ticks, ordered=True
+    )
     df = df.sort_values(["window", "area_short", "series"])
 
-    fig, axes = plt.subplots(1, len(window_order), figsize=(3.33, 2.2), sharey=True)
+    fig, axes = plt.subplots(
+        1, len(window_order), figsize=FIGSIZE_THREE_ACROSS, sharey=True
+    )
 
     for i, window in enumerate(window_order):
         ax = axes[i]
@@ -679,6 +687,7 @@ def plot_spatio_temporal_range(
                     dashes=False,
                     markersize=6,
                     linewidth=1.5,
+                    sort=False,
                 )
             else:
                 sns.barplot(
@@ -695,15 +704,8 @@ def plot_spatio_temporal_range(
 
         ax.set_title(window, fontsize=FONT_SIZE)
         ax.set_xlabel("")
-        plt.setp(ax.get_xticklabels(), rotation=0, ha="center", fontsize=FONT_SIZE)
-        ax.set_xscale("log")
-        ax.set_xlim(
-            min(area_ticks) / x_padding_factor, max(area_ticks) * x_padding_factor
-        )
-        ax.xaxis.set_major_locator(FixedLocator(area_ticks))
-        ax.xaxis.set_major_formatter(
-            FixedFormatter([str(value) for value in area_ticks])
-        )
+        plt.setp(ax.get_xticklabels(), rotation=90, ha="center", fontsize=FONT_SIZE)
+        ax.margins(x=0.15)
         ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
         ax.set_axisbelow(True)
         ax.set_yscale("log")
@@ -754,7 +756,7 @@ def plot_spatio_temporal_range(
     # Draw centered X-axis label beneath the subplots
     fig.text(
         center_x,
-        0.05,
+        0.0,
         r"Area ($\mathrm{km}^2$)",
         ha="center",
         va="center",
@@ -781,6 +783,7 @@ def plot_spatio_temporal_range(
         bbox_to_anchor=(center_x, legend_y),
         ncol=2,
         frameon=False,
+        columnspacing=LEGEND_COLUMNSPACING,
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1020,6 +1023,7 @@ def plot_thread_scalability(
         bbox_to_anchor=(center_x, legend_y),
         ncol=2,
         frameon=False,
+        columnspacing=LEGEND_COLUMNSPACING,
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1169,6 +1173,7 @@ def plot_passage_query(
         bbox_to_anchor=(center_x, legend_y),
         ncol=2,
         frameon=False,
+        columnspacing=LEGEND_COLUMNSPACING,
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

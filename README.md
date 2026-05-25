@@ -98,10 +98,10 @@ Parameter style for DuckDB is `?` (not `%s`).
 ```
 #### Benchmark results (--json)
 - `benchmarking/benchmark_results/run_20260508_133426.json` is the latest run (05/08/2026) with all benchmarks (except ID Temporal, spatial range w/o r-tree, coverage_by_mmsi), 1, 2, 4, 8, 16, 32, 64, and 120 threads, warm runs.
-- `benchmarking/benchmark_results/run_20260514_120035.json` is the "no R-tree" spatial range run (64 threads), warm runs.
 - `benchmarking/benchmark_results/run_20260515_152400.json` is the coverage_mmsi_benchmark.py on zoom 13, 14, 15, 16, 17, 18, 19 (64 threads), warm runs.
 - `benchmarking/benchmark_results/run_20260519_195550.json` is the coverage_mmsi_benchmark.py on zoom 19 run on 1, 2, 4, 8, 16, 32, 64, 120 threads, warm runs.
 - `benchmarking/benchmark_results/run_20260520_074714.json` is the spatial range run with the new "medium-large" regions with and w/o R-Tree (64 threads), warm runs.
+- `benchmarking/benchmark_results/run_20260521_090907.json` is the spatio-temporal range run with the new "medium-large" regions (64 threads), warm runs.
 ### Temporal range query line charts
 `python -m benchmarking.graphs.paper_graphs --plot temporal --type line --json benchmarking/benchmark_results/run_20260508_133426.json --threads 64`
 ### Spatial range query line charts with R-Tree

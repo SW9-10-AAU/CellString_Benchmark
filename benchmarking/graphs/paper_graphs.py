@@ -156,7 +156,10 @@ def _load_report(path: str) -> Dict[str, Any]:
 
 
 def plot_temporal_range(
-    data: Dict[str, Any], thread_filter: List[int] = None, plot_type: str = "bar"
+    data: Dict[str, Any],
+    thread_filter: List[int] = None,
+    plot_type: str = "bar",
+    show_legend: bool = True,
 ) -> None:
     benchmarks = data.get("benchmarks", [])
     rows = []
@@ -322,6 +325,7 @@ def plot_spatial_range(
     thread_filter: List[int] = None,
     plot_type: str = "bar",
     include_no_rtree: bool = False,
+    show_legend: bool = True,
 ) -> None:
     benchmarks = data.get("benchmarks", [])
     rows = []
@@ -535,20 +539,21 @@ def plot_spatial_range(
 
     plt.tight_layout(pad=0.1)
 
-    # Floating legend above the plot, centered on the axes
-    box = ax.get_position()
-    center_x = (box.x0 + box.x1) / 2
-    handles, labels = ax.get_legend_handles_labels()
-    legend_y = box.y1 + 0.02
-    fig.legend(
-        handles,
-        labels,
-        loc="lower center",
-        bbox_to_anchor=(center_x, legend_y),
-        ncol=2,
-        frameon=False,
-        columnspacing=LEGEND_COLUMNSPACING,
-    )
+    if show_legend:
+        # Floating legend above the plot, centered on the axes
+        box = ax.get_position()
+        center_x = (box.x0 + box.x1) / 2
+        handles, labels = ax.get_legend_handles_labels()
+        legend_y = box.y1 + 0.02
+        fig.legend(
+            handles,
+            labels,
+            loc="lower center",
+            bbox_to_anchor=(center_x, legend_y),
+            ncol=2,
+            frameon=False,
+            columnspacing=LEGEND_COLUMNSPACING,
+        )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -566,6 +571,7 @@ def plot_spatio_temporal_range(
     traffic: str = "both",
     thread_filter: List[int] = None,
     plot_type: str = "bar",
+    show_legend: bool = True,
 ) -> None:
     benchmarks = data.get("benchmarks", [])
     rows = []
@@ -773,18 +779,19 @@ def plot_spatio_temporal_range(
         fontsize=FONT_SIZE,
     )
 
-    # Draw a global figure legend exactly over that center
-    handles, labels = axes[0].get_legend_handles_labels()
-    legend_y = box0.y1 + 0.10
-    fig.legend(
-        handles,
-        labels,
-        loc="lower center",
-        bbox_to_anchor=(center_x, legend_y),
-        ncol=2,
-        frameon=False,
-        columnspacing=LEGEND_COLUMNSPACING,
-    )
+    if show_legend:
+        # Draw a global figure legend exactly over that center
+        handles, labels = axes[0].get_legend_handles_labels()
+        legend_y = box0.y1 + 0.10
+        fig.legend(
+            handles,
+            labels,
+            loc="lower center",
+            bbox_to_anchor=(center_x, legend_y),
+            ncol=2,
+            frameon=False,
+            columnspacing=LEGEND_COLUMNSPACING,
+        )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     pgf_path = _next_output_path(f"spatio_temporal_range_{traffic}_paper", ".pgf")
@@ -1366,22 +1373,37 @@ def main():
         type=str,
         help="Passage name or crossings string filter for passage thread scalability plots.",
     )
+    parser.add_argument(
+        "--no-legend",
+        action="store_true",
+        help="Suppress the floating legend for the selected plot.",
+    )
     args = parser.parse_args()
 
     data = _load_report(args.json)
 
     if args.plot == "temporal":
-        plot_temporal_range(data, thread_filter=args.threads, plot_type=args.type)
+        plot_temporal_range(
+            data,
+            thread_filter=args.threads,
+            plot_type=args.type,
+            show_legend=not args.no_legend,
+        )
     elif args.plot == "spatial":
         plot_spatial_range(
             data,
             thread_filter=args.threads,
             plot_type=args.type,
             include_no_rtree=args.spatial_include_no_rtree,
+            show_legend=not args.no_legend,
         )
     elif args.plot == "spatio-temporal":
         plot_spatio_temporal_range(
-            data, traffic=args.traffic, thread_filter=args.threads, plot_type=args.type
+            data,
+            traffic=args.traffic,
+            thread_filter=args.threads,
+            plot_type=args.type,
+            show_legend=not args.no_legend,
         )
     elif args.plot == "thread-scalability":
         plot_thread_scalability(

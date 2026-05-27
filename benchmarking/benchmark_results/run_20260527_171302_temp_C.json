@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "run_started_at": "2026-05-27T17:13:02.230121+00:00",
+    "run_label": "server",
+    "cache_state": "warm",
+    "db_backend": "duckdb",
+    "duckdb_path": "/home/ubuntu/duckdb_data/cellstring.duckdb",
+    "linestring_schema": "p10_ls",
+    "cellstring_schema": "p10_cs",
+    "thread_plan": [
+      64
+    ],
+    "trajectory_count": 0,
+    "trajectory_ids": [],
+    "trajectory_cardinalities": {},
+    "trajectory_lengths": {},
+    "stop_count": 0,
+    "stop_ids": [],
+    "cold_run_note": "For cold runs on Linux: sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches"
+  },
+  "benchmarks": [
+    {
+      "name": "Temporal range query (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs_C"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 0.451
+        },
+        "cst": {
+          "exec_ms_med": 305.646
+        },
+        "false_positives": 3663,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 3663
+        }
+      }
+    }
+  ]
+}

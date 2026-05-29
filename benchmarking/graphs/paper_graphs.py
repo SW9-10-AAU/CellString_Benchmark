@@ -762,14 +762,14 @@ def plot_spatio_temporal_range(
     # Draw centered X-axis label beneath the subplots
     fig.text(
         center_x,
-        0.0,
+        -0.02,
         r"Area ($\mathrm{km}^2$)",
         ha="center",
         va="center",
         fontsize=FONT_SIZE,
     )
     # Draw centered top X-axis label above the subplots (dynamically spaced above the axes)
-    days_y = box0.y1 + 0.08
+    days_y = box0.y1 + 0.11
     fig.text(
         center_x,
         days_y,

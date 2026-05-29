@@ -14,9 +14,7 @@ SET VARIABLE query_traj_mmsi = (SELECT mmsi FROM {trajectory_ls_table} WHERE tra
 SET VARIABLE query_traj_geom = (SELECT geom FROM {trajectory_ls_table} WHERE trajectory_id = getvariable('query_traj_id'));
 SET VARIABLE query_traj_ts_start = (SELECT ts_start FROM {trajectory_ls_table} WHERE trajectory_id = getvariable('query_traj_id'));
 SET VARIABLE query_traj_ts_end = (SELECT ts_end FROM {trajectory_ls_table} WHERE trajectory_id = getvariable('query_traj_id'));
-""".format(
-    trajectory_ls_table=TRAJECTORY_LS_TABLE
-)
+""".format(trajectory_ls_table=TRAJECTORY_LS_TABLE)
 
 ST_SQL = """
 SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
@@ -45,7 +43,7 @@ SET VARIABLE query_traj_id = ?;
 
 CST_SQL = """
 WITH query_traj AS (
-    SELECT mmsi, trajectory_id, ts, delta_sec, cell_z21
+    SELECT mmsi, trajectory_id, ts_entry, ts_exit, cell_z21
     FROM {trajectory_cs_table}
     WHERE trajectory_id = getvariable('query_traj_id')
 )
@@ -53,8 +51,8 @@ SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' 
 FROM {trajectory_cs_table} t
 JOIN query_traj q ON t.cell_z21 = q.cell_z21
 WHERE t.mmsi <> q.mmsi
-  AND t.ts <= q.ts + (INTERVAL (q.delta_sec) SECOND)
-  AND t.ts + (INTERVAL (t.delta_sec) SECOND) >= q.ts
+  AND t.ts_entry <= q.ts_entry 
+  AND t.ts_exit >= q.ts_exit
 
 UNION ALL
 
@@ -62,12 +60,13 @@ SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS sou
 FROM {stop_cs_table} AS s
 JOIN query_traj q ON s.cell_z21 = q.cell_z21
 WHERE s.mmsi <> q.mmsi
-  AND s.ts_start <= q.ts + (INTERVAL (q.delta_sec) SECOND)
-  AND s.ts_end >= q.ts;
+  AND s.ts_start <= q.ts_entry
+  AND s.ts_end >= q.ts_exit;
 """.format(
     trajectory_cs_table=TRAJECTORY_CS_TABLE,
     stop_cs_table=STOP_CS_TABLE,
 )
+
 
 def build_spatio_temporal_join_benchmark() -> TimeBenchmark:
     return TimeBenchmark(
@@ -81,6 +80,5 @@ def build_spatio_temporal_join_benchmark() -> TimeBenchmark:
         setup_uses_id=True,
     )
 
-SPATIO_TEMPORAL_JOIN_BENCHMARKS = [
-    build_spatio_temporal_join_benchmark()
-]
+
+SPATIO_TEMPORAL_JOIN_BENCHMARKS = [build_spatio_temporal_join_benchmark()]

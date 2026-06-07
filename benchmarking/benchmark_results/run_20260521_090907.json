@@ -1,0 +1,919 @@
+{
+  "meta": {
+    "run_started_at": "2026-05-21T09:09:07.431045+00:00",
+    "run_label": "server",
+    "cache_state": "warm",
+    "db_backend": "duckdb",
+    "duckdb_path": "/home/ubuntu/duckdb_data/cellstring.duckdb",
+    "linestring_schema": "p10_ls",
+    "cellstring_schema": "p10_cs",
+    "thread_plan": [
+      64
+    ],
+    "trajectory_count": 0,
+    "trajectory_ids": [],
+    "trajectory_cardinalities": {},
+    "trajectory_lengths": {},
+    "stop_count": 0,
+    "stop_ids": [],
+    "cold_run_note": "For cold runs on Linux: sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches"
+  },
+  "benchmarks": [
+    {
+      "name": "Spatio-temporal range query - region 1 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2413.9
+        },
+        "cst": {
+          "exec_ms_med": 163.576
+        },
+        "false_positives": 2,
+        "false_negatives": 1,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 13,
+          "CellString": 14
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 2 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2993.762
+        },
+        "cst": {
+          "exec_ms_med": 180.732
+        },
+        "false_positives": 0,
+        "false_negatives": 7,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 83,
+          "CellString": 76
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 7 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2743.729
+        },
+        "cst": {
+          "exec_ms_med": 202.338
+        },
+        "false_positives": 1,
+        "false_negatives": 10,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 107,
+          "CellString": 98
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 3 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2706.268
+        },
+        "cst": {
+          "exec_ms_med": 232.944
+        },
+        "false_positives": 0,
+        "false_negatives": 11,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 135,
+          "CellString": 124
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 4 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2067.873
+        },
+        "cst": {
+          "exec_ms_med": 154.17
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 0
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 5 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 1900.724
+        },
+        "cst": {
+          "exec_ms_med": 157.002
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 0
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 8 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2063.957
+        },
+        "cst": {
+          "exec_ms_med": 173.289
+        },
+        "false_positives": 1,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 6,
+          "CellString": 7
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 6 (1)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2961.489
+        },
+        "cst": {
+          "exec_ms_med": 192.831
+        },
+        "false_positives": 0,
+        "false_negatives": 1,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 19,
+          "CellString": 18
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 1 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2494.806
+        },
+        "cst": {
+          "exec_ms_med": 198.513
+        },
+        "false_positives": 5,
+        "false_negatives": 2,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 75,
+          "CellString": 78
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 2 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2250.731
+        },
+        "cst": {
+          "exec_ms_med": 188.104
+        },
+        "false_positives": 0,
+        "false_negatives": 8,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 413,
+          "CellString": 405
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 7 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2496.493
+        },
+        "cst": {
+          "exec_ms_med": 249.994
+        },
+        "false_positives": 1,
+        "false_negatives": 8,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 515,
+          "CellString": 508
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 3 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2722.749
+        },
+        "cst": {
+          "exec_ms_med": 355.055
+        },
+        "false_positives": 0,
+        "false_negatives": 7,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 603,
+          "CellString": 596
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 4 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 3266.177
+        },
+        "cst": {
+          "exec_ms_med": 186.835
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 0
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 5 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2511.552
+        },
+        "cst": {
+          "exec_ms_med": 168.647
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 0
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 8 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2532.072
+        },
+        "cst": {
+          "exec_ms_med": 198.263
+        },
+        "false_positives": 0,
+        "false_negatives": 1,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 43,
+          "CellString": 42
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 6 (7)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2703.095
+        },
+        "cst": {
+          "exec_ms_med": 209.514
+        },
+        "false_positives": 0,
+        "false_negatives": 1,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 78,
+          "CellString": 77
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 1 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 2817.139
+        },
+        "cst": {
+          "exec_ms_med": 237.458
+        },
+        "false_positives": 10,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 374,
+          "CellString": 384
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 2 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 3738.217
+        },
+        "cst": {
+          "exec_ms_med": 235.381
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 1315,
+          "CellString": 1315
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 7 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 3337.904
+        },
+        "cst": {
+          "exec_ms_med": 593.43
+        },
+        "false_positives": 2,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 1528,
+          "CellString": 1530
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 3 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 3635.938
+        },
+        "cst": {
+          "exec_ms_med": 1003.241
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 1730,
+          "CellString": 1730
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 4 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 3519.129
+        },
+        "cst": {
+          "exec_ms_med": 225.853
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 0,
+          "CellString": 0
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 5 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 3656.193
+        },
+        "cst": {
+          "exec_ms_med": 224.821
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 1,
+          "CellString": 1
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 8 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 3611.473
+        },
+        "cst": {
+          "exec_ms_med": 271.316
+        },
+        "false_positives": 1,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 132,
+          "CellString": 133
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 6 (30)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 5003.759
+        },
+        "cst": {
+          "exec_ms_med": 334.123
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 233,
+          "CellString": 233
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 1 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 5653.125
+        },
+        "cst": {
+          "exec_ms_med": 765.862
+        },
+        "false_positives": 26,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 1587,
+          "CellString": 1613
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 2 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 5801.435
+        },
+        "cst": {
+          "exec_ms_med": 1059.586
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4158,
+          "CellString": 4158
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 7 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 5382.178
+        },
+        "cst": {
+          "exec_ms_med": 2987.216
+        },
+        "false_positives": 1,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4565,
+          "CellString": 4566
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 3 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 6094.219
+        },
+        "cst": {
+          "exec_ms_med": 5304.918
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4905,
+          "CellString": 4905
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 4 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 5277.274
+        },
+        "cst": {
+          "exec_ms_med": 679.333
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4,
+          "CellString": 4
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 5 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 5777.756
+        },
+        "cst": {
+          "exec_ms_med": 689.211
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 12,
+          "CellString": 12
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 8 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 6604.795
+        },
+        "cst": {
+          "exec_ms_med": 955.326
+        },
+        "false_positives": 4,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 462,
+          "CellString": 466
+        }
+      }
+    },
+    {
+      "name": "Spatio-temporal range query - region 6 (180)",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 6660.479
+        },
+        "cst": {
+          "exec_ms_med": 1153.022
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 686,
+          "CellString": 686
+        }
+      }
+    }
+  ]
+}

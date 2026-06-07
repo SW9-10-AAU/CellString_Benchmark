@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import platform
+import subprocess
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -13,11 +15,17 @@ class TimeBenchmark:
     st_sql: str
     cst_sql: str
     params: Tuple[Any, ...] = tuple()
+    st_setup_sql: str = ""
+    cst_setup_sql: str = ""
+    st_setup_params: Tuple[Any, ...] = tuple()
+    cst_setup_params: Tuple[Any, ...] = tuple()
     repeats: int = 5
     with_trajectory_ids: bool = False
     with_stop_ids: bool = False
-    area_ids: List[int] = field(default_factory=list)
-    use_area_ids: bool = False
+    region_ids: List[int] = field(default_factory=list)
+    use_region_ids: bool = False
+    sql_uses_id: bool = True
+    setup_uses_id: bool = False
 
 
 @dataclass(frozen=True)
@@ -47,7 +55,22 @@ class TimeBenchmarkResult:
     cst: RunOutcome
     false_positives: int
     false_negatives: int
-    per_area_results: Dict[int, Dict[str, RunOutcome]] = field(default_factory=dict)
+    per_region_results: Dict[int, Dict[str, RunOutcome]] = field(default_factory=dict)
+    result_counts: Dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ColdHotOutcome:
+    cold_ms: float
+    hot_ms: float
+    all_runs_ms: List[float]
+
+
+@dataclass
+class ColdHotBenchmarkResult:
+    name: str
+    st: ColdHotOutcome
+    cst: ColdHotOutcome
     result_counts: Dict[str, int] = field(default_factory=dict)
 
 
@@ -64,8 +87,16 @@ def _reset_connection(cur) -> None:
 
 
 def _execute_with_timing(
-    cur, sql: str, params: Sequence[Any]
+    cur,
+    sql: str,
+    params: Sequence[Any],
+    *,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
 ) -> Tuple[List[Tuple], float]:
+    if setup_sql:
+        _reset_connection(cur)
+        _run_setup_sql(cur, setup_sql, setup_params)
     _reset_connection(cur)
     start = time.perf_counter()
     cur.execute(sql, params)
@@ -73,8 +104,49 @@ def _execute_with_timing(
     return rows, (time.perf_counter() - start) * 1000.0
 
 
-def _warmup(cur, sql: str, params: Sequence[Any]) -> None:
-    _execute_with_timing(cur, sql, params)
+def _run_setup_sql(cur, setup_sql: str, setup_params: Sequence[Any]) -> None:
+    statements = [stmt.strip() for stmt in setup_sql.split(";") if stmt.strip()]
+    if not statements:
+        return
+
+    params_list = list(setup_params)
+    param_index = 0
+    for statement in statements:
+        placeholders = statement.count("?")
+        statement_params: Sequence[Any] = tuple()
+        if placeholders:
+            end_index = param_index + placeholders
+            if end_index > len(params_list):
+                raise ValueError(
+                    "setup_sql placeholders exceed provided setup_params "
+                    f"(needed at least {end_index}, got {len(params_list)})"
+                )
+            statement_params = tuple(params_list[param_index:end_index])
+            param_index = end_index
+        cur.execute(statement, statement_params)
+
+    if param_index != len(params_list):
+        raise ValueError(
+            "setup_params has unused values for setup_sql "
+            f"(used {param_index}, provided {len(params_list)})"
+        )
+
+
+def _warmup(
+    cur,
+    sql: str,
+    params: Sequence[Any],
+    *,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
+) -> None:
+    _execute_with_timing(
+        cur,
+        sql,
+        params,
+        setup_sql=setup_sql,
+        setup_params=setup_params,
+    )
 
 
 def _median_or_zero(values: Iterable[float]) -> float:
@@ -123,6 +195,10 @@ def _execute_random_or_repeated_queries(
     trajectory_ids: List[int] | None = None,
     stop_ids: List[int] | None = None,
     sample_label: str | None = None,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
+    sql_uses_id: bool = True,
+    setup_uses_id: bool = False,
 ) -> RunOutcome:
     if trajectory_ids is not None and not trajectory_ids:
         return RunOutcome(0.0, [])
@@ -134,12 +210,26 @@ def _execute_random_or_repeated_queries(
     run_repeats = repeats or 1
 
     if trajectory_ids is not None:
-        first_params = (trajectory_ids[0],) + base_params
-        _warmup(cur, sql, first_params)
+        first_params = (trajectory_ids[0],) + base_params if sql_uses_id else base_params
+        first_setup_params = (trajectory_ids[0],) + tuple(setup_params) if setup_uses_id else setup_params
+        _warmup(
+            cur,
+            sql,
+            first_params,
+            setup_sql=setup_sql,
+            setup_params=first_setup_params,
+        )
 
         for trajectory_id in trajectory_ids:
-            current_params = (trajectory_id,) + base_params
-            rows, exec_ms = _execute_with_timing(cur, sql, current_params)
+            current_params = (trajectory_id,) + base_params if sql_uses_id else base_params
+            current_setup_params = (trajectory_id,) + tuple(setup_params) if setup_uses_id else setup_params
+            rows, exec_ms = _execute_with_timing(
+                cur,
+                sql,
+                current_params,
+                setup_sql=setup_sql,
+                setup_params=current_setup_params,
+            )
             exec_times.append(exec_ms)
             collected_rows.extend(rows)
             sample: Dict[str, Any] = {}
@@ -149,12 +239,26 @@ def _execute_random_or_repeated_queries(
                 sample["label"] = sample_label
             sample_records.append(sample)
     elif stop_ids is not None:
-        first_params = (stop_ids[0],) + base_params
-        _warmup(cur, sql, first_params)
+        first_params = (stop_ids[0],) + base_params if sql_uses_id else base_params
+        first_setup_params = (stop_ids[0],) + tuple(setup_params) if setup_uses_id else setup_params
+        _warmup(
+            cur,
+            sql,
+            first_params,
+            setup_sql=setup_sql,
+            setup_params=first_setup_params,
+        )
 
         for stop_id in stop_ids:
-            current_params = (stop_id,) + base_params
-            rows, exec_ms = _execute_with_timing(cur, sql, current_params)
+            current_params = (stop_id,) + base_params if sql_uses_id else base_params
+            current_setup_params = (stop_id,) + tuple(setup_params) if setup_uses_id else setup_params
+            rows, exec_ms = _execute_with_timing(
+                cur,
+                sql,
+                current_params,
+                setup_sql=setup_sql,
+                setup_params=current_setup_params,
+            )
             exec_times.append(exec_ms)
             collected_rows.extend(rows)
             sample: Dict[str, Any] = {}
@@ -164,15 +268,35 @@ def _execute_random_or_repeated_queries(
                 sample["label"] = sample_label
             sample_records.append(sample)
     else:
-        _warmup(cur, sql, base_params)
-        rows, _ = _execute_with_timing(cur, sql, base_params)
+        _warmup(
+            cur,
+            sql,
+            base_params,
+            setup_sql=setup_sql,
+            setup_params=setup_params,
+        )
+        rows, _ = _execute_with_timing(
+            cur,
+            sql,
+            base_params,
+            setup_sql=setup_sql,
+            setup_params=setup_params,
+        )
         collected_rows = rows
         for _ in range(run_repeats):
-            _, exec_ms = _execute_with_timing(cur, sql, base_params)
+            _, exec_ms = _execute_with_timing(
+                cur,
+                sql,
+                base_params,
+                setup_sql=setup_sql,
+                setup_params=setup_params,
+            )
             exec_times.append(exec_ms)
 
     _reset_connection(cur)
-    return RunOutcome(_median_or_zero(exec_times), collected_rows, samples=sample_records)
+    return RunOutcome(
+        _median_or_zero(exec_times), collected_rows, samples=sample_records
+    )
 
 
 def run_time_benchmark(
@@ -181,35 +305,39 @@ def run_time_benchmark(
     trajectory_ids: List[int] | None = None,
     stop_ids: List[int] | None = None,
 ) -> TimeBenchmarkResult:
-    per_area_results: Dict[int, Dict[str, RunOutcome]] = {}
+    per_region_results: Dict[int, Dict[str, RunOutcome]] = {}
 
     cur = connection.cursor()
     try:
-        if benchmark.use_area_ids and benchmark.area_ids:
+        if benchmark.use_region_ids and benchmark.region_ids:
             st_rows: List[Tuple] = []
             valid_st_runs: List[RunOutcome] = []
             cst_rows: List[Tuple] = []
             valid_cst_runs: List[RunOutcome] = []
 
-            for area_id in benchmark.area_ids:
-                area_params = (area_id,) + benchmark.params
+            for region_id in benchmark.region_ids:
+                region_params = (region_id,) + benchmark.params
                 st_run = _execute_random_or_repeated_queries(
                     cur,
                     benchmark.st_sql,
-                    area_params,
+                    region_params,
                     repeats=benchmark.repeats,
+                    setup_sql=benchmark.st_setup_sql,
+                    setup_params=benchmark.st_setup_params,
                 )
-                per_area_results[area_id] = {"st": st_run}
+                per_region_results[region_id] = {"st": st_run}
                 st_rows.extend(st_run.rows)
                 valid_st_runs.append(st_run)
 
                 cst_run = _execute_random_or_repeated_queries(
                     cur,
                     benchmark.cst_sql,
-                    area_params,
+                    region_params,
                     repeats=benchmark.repeats,
+                    setup_sql=benchmark.cst_setup_sql,
+                    setup_params=benchmark.cst_setup_params,
                 )
-                per_area_results[area_id]["cst"] = cst_run
+                per_region_results[region_id]["cst"] = cst_run
                 cst_rows.extend(cst_run.rows)
                 valid_cst_runs.append(cst_run)
 
@@ -222,6 +350,10 @@ def run_time_benchmark(
                 benchmark.params,
                 trajectory_ids=trajectory_ids,
                 sample_label="LineString",
+                setup_sql=benchmark.st_setup_sql,
+                setup_params=benchmark.st_setup_params,
+                sql_uses_id=benchmark.sql_uses_id,
+                setup_uses_id=benchmark.setup_uses_id,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
@@ -229,6 +361,10 @@ def run_time_benchmark(
                 benchmark.params,
                 trajectory_ids=trajectory_ids,
                 sample_label="CellString",
+                setup_sql=benchmark.cst_setup_sql,
+                setup_params=benchmark.cst_setup_params,
+                sql_uses_id=benchmark.sql_uses_id,
+                setup_uses_id=benchmark.setup_uses_id,
             )
         elif benchmark.with_stop_ids:
             st_out = _execute_random_or_repeated_queries(
@@ -236,6 +372,10 @@ def run_time_benchmark(
                 benchmark.st_sql,
                 benchmark.params,
                 stop_ids=stop_ids,
+                setup_sql=benchmark.st_setup_sql,
+                setup_params=benchmark.st_setup_params,
+                sql_uses_id=benchmark.sql_uses_id,
+                setup_uses_id=benchmark.setup_uses_id,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
@@ -243,6 +383,10 @@ def run_time_benchmark(
                 benchmark.params,
                 stop_ids=stop_ids,
                 sample_label="CellString",
+                setup_sql=benchmark.cst_setup_sql,
+                setup_params=benchmark.cst_setup_params,
+                sql_uses_id=benchmark.sql_uses_id,
+                setup_uses_id=benchmark.setup_uses_id,
             )
         else:
             st_out = _execute_random_or_repeated_queries(
@@ -250,12 +394,16 @@ def run_time_benchmark(
                 benchmark.st_sql,
                 benchmark.params,
                 repeats=benchmark.repeats,
+                setup_sql=benchmark.st_setup_sql,
+                setup_params=benchmark.st_setup_params,
             )
             cst_out = _execute_random_or_repeated_queries(
                 cur,
                 benchmark.cst_sql,
                 benchmark.params,
                 repeats=benchmark.repeats,
+                setup_sql=benchmark.cst_setup_sql,
+                setup_params=benchmark.cst_setup_params,
             )
 
     finally:
@@ -276,7 +424,7 @@ def run_time_benchmark(
         cst_out,
         false_positives,
         false_negatives,
-        per_area_results,
+        per_region_results,
         result_counts,
     )
 
@@ -363,11 +511,11 @@ def print_time_result(result: TimeBenchmarkResult) -> None:
     print(f"False positives (CellString \\ LineString): {result.false_positives}")
     print(f"False negatives (LineString \\ CellString): {result.false_negatives}")
     print("----------------------------")
-    if result.per_area_results:
-        print("Per-area breakdown:")
-        for area_id in sorted(result.per_area_results):
-            print(f"Area {area_id}:")
-            for label, run in result.per_area_results[area_id].items():
+    if result.per_region_results:
+        print("Per-region breakdown:")
+        for region_id in sorted(result.per_region_results):
+            print(f"Region {region_id}:")
+            for label, run in result.per_region_results[region_id].items():
                 _print_run(f"  {label}", run)
             print("----------------------------")
 
@@ -376,4 +524,140 @@ def print_value_result(result: ValueBenchmarkResult) -> None:
     print(f"\n--- {result.name} ---")
     for label, value in result.median_values.items():
         print(f"{label}: median value = {value:.10f}")
+    print("----------------------------")
+
+
+def _clear_os_page_cache() -> None:
+    """Clear the Linux filesystem page cache.
+
+    Equivalent to:
+        sync
+        echo 3 | sudo tee /proc/sys/vm/drop_caches
+    """
+    system = platform.system()
+    if system != "Linux":
+        print(
+            f"WARNING: OS page cache clearing is only supported on Linux "
+            f"(detected {system}). Skipping cache clear."
+        )
+        return
+
+    print("Clearing filesystem page cache...")
+    subprocess.run(["sync"], check=True)
+    subprocess.run(
+        ["sudo", "tee", "/proc/sys/vm/drop_caches"],
+        input=b"3",
+        stdout=subprocess.DEVNULL,
+        check=True,
+    )
+    print("Filesystem page cache cleared.")
+
+
+def _execute_cold_hot_single(
+    conn_factory,
+    sql: str,
+    params: Sequence[Any],
+    *,
+    setup_sql: str = "",
+    setup_params: Sequence[Any] = tuple(),
+    tries: int = 3,
+) -> tuple[ColdHotOutcome, List[Tuple]]:
+    """Run a query *tries* times, returning cold/hot timings.
+
+    Run 1 is preceded by an OS page-cache clear (cold run).
+    The connection is kept open so runs 2 .. *tries* benefit from DuckDB's
+    internal buffer pool (hot run).
+    """
+    all_times: List[float] = []
+    result_rows: List[Tuple] = []
+
+    conn = conn_factory()
+    try:
+        cur = conn.cursor()
+        try:
+            for i in range(tries):
+                if i == 0:
+                    _clear_os_page_cache()
+
+                rows, exec_ms = _execute_with_timing(
+                    cur,
+                    sql,
+                    params,
+                    setup_sql=setup_sql,
+                    setup_params=setup_params,
+                )
+                all_times.append(exec_ms)
+                if i == 0:
+                    result_rows = rows
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+    cold_ms = all_times[0]
+    hot_ms = min(all_times[1:]) if len(all_times) > 1 else cold_ms
+
+    outcome = ColdHotOutcome(
+        cold_ms=round(cold_ms, 3),
+        hot_ms=round(hot_ms, 3),
+        all_runs_ms=[round(t, 3) for t in all_times],
+    )
+    return outcome, result_rows
+
+
+def run_cold_hot_benchmark(
+    conn_factory,
+    benchmark: TimeBenchmark,
+) -> ColdHotBenchmarkResult:
+    """Execute a TimeBenchmark using the cold/hot methodology.
+
+    *conn_factory* is a zero-argument callable that returns a new, ready-to-use
+    DuckDB connection (with spatial loaded, threads set, etc.).
+    """
+    print(f"  [LineString] cold/hot ...")
+    st_outcome, st_rows = _execute_cold_hot_single(
+        conn_factory,
+        benchmark.st_sql,
+        benchmark.params,
+        setup_sql=benchmark.st_setup_sql,
+        setup_params=benchmark.st_setup_params,
+    )
+
+    print(f"  [CellString] cold/hot ...")
+    cst_outcome, cst_rows = _execute_cold_hot_single(
+        conn_factory,
+        benchmark.cst_sql,
+        benchmark.params,
+        setup_sql=benchmark.cst_setup_sql,
+        setup_params=benchmark.cst_setup_params,
+    )
+
+    st_keys = _keyset(st_rows)
+    cst_keys = _keyset(cst_rows)
+    result_counts: Dict[str, int] = {
+        "LineString": len(st_keys),
+        "CellString": len(cst_keys),
+    }
+
+    return ColdHotBenchmarkResult(
+        name=benchmark.name,
+        st=st_outcome,
+        cst=cst_outcome,
+        result_counts=result_counts,
+    )
+
+
+def print_cold_hot_result(result: ColdHotBenchmarkResult) -> None:
+    print(f"\n--- {result.name} (cold/hot) ---")
+    print(
+        f"  LineString:  cold={result.st.cold_ms:.1f}ms  "
+        f"hot={result.st.hot_ms:.1f}ms  "
+        f"all={result.st.all_runs_ms}"
+    )
+    print(
+        f"  CellString:  cold={result.cst.cold_ms:.1f}ms  "
+        f"hot={result.cst.hot_ms:.1f}ms  "
+        f"all={result.cst.all_runs_ms}"
+    )
+    print(f"  Result counts: {result.result_counts}")
     print("----------------------------")

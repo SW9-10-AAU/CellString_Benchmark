@@ -14,7 +14,7 @@ from benchmarking.table_config import (
 
 
 def _parse_start() -> datetime:
-    raw = os.getenv("TEMPORAL_RANGE_START", "2025-12-01 00:00:00")
+    raw = os.getenv("TEMPORAL_RANGE_START", "2025-10-01 00:00:00")
     # Accept both 'YYYY-MM-DD HH:MM:SS' and full ISO-8601 values.
     return datetime.fromisoformat(raw.replace("Z", "+00:00"))
 
@@ -24,21 +24,23 @@ def _window(start: datetime, days: int) -> tuple[str, str]:
     return (start.isoformat(sep=" "), end.isoformat(sep=" "))
 
 
+ST_SETUP_SQL = """
+SET VARIABLE ts_period_start = CAST(? AS TIMESTAMP);
+SET VARIABLE ts_period_end = CAST(? AS TIMESTAMP);
+"""
+
 ST_SQL = """
-WITH bounds AS (
-    SELECT CAST(? AS TIMESTAMP) AS t_start, CAST(? AS TIMESTAMP) AS t_end
-)
-SELECT DISTINCT t.mmsi, t.trajectory_id, CAST(NULL AS INTEGER) AS stop_id, 'trajectory' AS source
+SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_ls_table} AS t
-CROSS JOIN bounds AS b
-WHERE t.ts_start <= b.t_end
-  AND t.ts_end >= b.t_start
+WHERE t.ts_start <= getvariable('ts_period_end')
+  AND t.ts_end >= getvariable('ts_period_start')
+    
 UNION ALL
-SELECT DISTINCT s.mmsi, CAST(NULL AS INTEGER) AS trajectory_id, s.stop_id, 'stop' AS source
+    
+SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS source
 FROM {stop_poly_table} AS s
-CROSS JOIN bounds AS b
-WHERE s.ts_start <= b.t_end
-  AND s.ts_end >= b.t_start;
+WHERE s.ts_start <= getvariable('ts_period_end')
+  AND s.ts_end >= getvariable('ts_period_start');
 """
 
 ST_SQL = ST_SQL.format(
@@ -46,20 +48,24 @@ ST_SQL = ST_SQL.format(
     stop_poly_table=STOP_POLY_TABLE,
 )
 
+
+CST_SETUP_SQL = """
+SET VARIABLE ts_period_start = CAST(? AS TIMESTAMP);
+SET VARIABLE ts_period_end = CAST(? AS TIMESTAMP);
+"""
+
 CST_SQL = """
-WITH bounds AS (
-    SELECT CAST(? AS TIMESTAMP) AS t_start, CAST(? AS TIMESTAMP) AS t_end
-)
-SELECT DISTINCT t.mmsi, t.trajectory_id, CAST(NULL AS INTEGER) AS stop_id, 'trajectory' AS source
+SELECT DISTINCT t.mmsi, t.trajectory_id, NULL::INTEGER AS stop_id, 'trajectory' AS source
 FROM {trajectory_cs_table} AS t
-CROSS JOIN bounds AS b
-WHERE t.ts BETWEEN b.t_start AND b.t_end
+WHERE t.ts_entry <= getvariable('ts_period_end')
+  AND t.ts_exit >= getvariable('ts_period_start')
+
 UNION ALL
-SELECT DISTINCT s.mmsi, CAST(NULL AS INTEGER) AS trajectory_id, s.stop_id, 'stop' AS source
+
+SELECT DISTINCT s.mmsi, NULL::INTEGER AS trajectory_id, s.stop_id, 'stop' AS source
 FROM {stop_cs_table} AS s
-CROSS JOIN bounds AS b
-WHERE s.ts_start <= b.t_end
-  AND s.ts_end >= b.t_start;
+WHERE s.ts_start <= getvariable('ts_period_end')
+  AND s.ts_end >= getvariable('ts_period_start');
 """
 
 CST_SQL = CST_SQL.format(
@@ -75,13 +81,18 @@ def build_temporal_range_benchmark(label: str, days: int) -> TimeBenchmark:
         name=f"Temporal range query ({label})",
         st_sql=ST_SQL,
         cst_sql=CST_SQL,
-        params=(t_start, t_end),
+        st_setup_sql=ST_SETUP_SQL,
+        cst_setup_sql=CST_SETUP_SQL,
+        st_setup_params=(t_start, t_end),
+        cst_setup_params=(t_start, t_end),
+        params=tuple(),
         repeats=5,
     )
 
 
 TEMPORAL_RANGE_BENCHMARKS: List[TimeBenchmark] = [
-    build_temporal_range_benchmark("1 day", 1),
-    build_temporal_range_benchmark("1 week", 7),
-    build_temporal_range_benchmark("1 month", 30),
+    build_temporal_range_benchmark("1", 1),
+    build_temporal_range_benchmark("7", 7),
+    build_temporal_range_benchmark("30", 30),
+    build_temporal_range_benchmark("180", 180),
 ]

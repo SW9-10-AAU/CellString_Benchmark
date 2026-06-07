@@ -7,12 +7,12 @@ SQL_TEMPLATE = f"""
 WITH area AS (
     SELECT
         list(cell_z21) AS cells,
-        CAST(? AS INTEGER) AS area_id
+        CAST(? AS INTEGER) AS region_id
     FROM {AREA_CS_TABLE}
-    WHERE area_id = ?
+    WHERE region_id = ?
 )
 SELECT
-    area.area_id,
+    area.region_id,
     coverage.mmsi,
     coverage.coverage_percent
 FROM area
@@ -31,9 +31,10 @@ def build_area_coverage_benchmark(area_id: int) -> ValueBenchmark:
         sql=SQL_TEMPLATE,
         params=(area_id, area_id),
         capture_rows=True,
-        row_field_names=["area_id", "mmsi", "coverage_percent"],
+        row_field_names=["region_id", "mmsi", "coverage_percent"],
     )
 
 
-AREA_MMSI_COVERAGE_BENCHMARKS = [build_area_coverage_benchmark(area_id) for area_id in (2, 3)]
-
+AREA_MMSI_COVERAGE_BENCHMARKS = [
+    build_area_coverage_benchmark(area_id) for area_id in (2, 3)
+]

@@ -112,14 +112,14 @@ TEMPORAL_RANGE_NAME_PATTERN = re.compile(
 SPATIAL_AREA_GROUPS = {
     1: (1, "high"),
     2: (24, "high"),
-    3: (435, "high"),
+    3: (436, "high"),
     4: (1, "low"),
     5: (24, "low"),
-    6: (435, "low"),
+    6: (436, "low"),
     7: (128, "high"),
     8: (128, "low"),
 }
-SPATIAL_AREA_ORDER = [1, 24, 128, 435]
+SPATIAL_AREA_ORDER = [1, 24, 128, 436]
 SPATIAL_RANGE_NAME_PATTERN = re.compile(
     r"^Spatial range query\s*-\s*(?:area|region)\s*(?P<region_id>\d+)$", re.IGNORECASE
 )
@@ -935,7 +935,7 @@ def plot_thread_scalability(
             base_name, area_text = label.split(" (", 1)
             area_match = re.search(r"\d+", area_text)
             area_value = float(area_match.group(0)) if area_match else 0
-            if area_value == 435:
+            if area_value == 436:
                 palette[label] = base_colors.get(base_name, VIBRANT_COLORS[0])
                 marker_map[label] = base_markers.get(base_name, "o")
             else:

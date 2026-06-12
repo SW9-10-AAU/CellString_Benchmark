@@ -1,0 +1,942 @@
+{
+  "meta": {
+    "run_started_at": "2026-06-12T12:48:52.236858+00:00",
+    "run_label": "server",
+    "cache_state": "warm",
+    "db_backend": "duckdb",
+    "duckdb_path": "/home/ubuntu/duckdb_data/cellstring.duckdb",
+    "linestring_schema": "p10_ls",
+    "cellstring_schema": "p10_cs",
+    "thread_plan": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      64,
+      120
+    ],
+    "trajectory_count": 0,
+    "trajectory_ids": [],
+    "trajectory_cardinalities": {},
+    "trajectory_lengths": {},
+    "stop_count": 0,
+    "stop_ids": [],
+    "cold_run_note": "For cold runs on Linux: sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches"
+  },
+  "benchmarks": [
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 5666.523
+        },
+        "cst": {
+          "exec_ms_med": 22273.648
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 4426.361
+        },
+        "cst": {
+          "exec_ms_med": 292167.59
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 27678.528
+        },
+        "cst": {
+          "exec_ms_med": 23420.856
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 1,
+      "result": {
+        "st": {
+          "exec_ms_med": 28942.303
+        },
+        "cst": {
+          "exec_ms_med": 273377.605
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 2,
+      "result": {
+        "st": {
+          "exec_ms_med": 7440.978
+        },
+        "cst": {
+          "exec_ms_med": 11524.349
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 2,
+      "result": {
+        "st": {
+          "exec_ms_med": 7786.724
+        },
+        "cst": {
+          "exec_ms_med": 93800.776
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 2,
+      "result": {
+        "st": {
+          "exec_ms_med": 12442.108
+        },
+        "cst": {
+          "exec_ms_med": 11562.334
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 2,
+      "result": {
+        "st": {
+          "exec_ms_med": 13227.486
+        },
+        "cst": {
+          "exec_ms_med": 97786.318
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 4,
+      "result": {
+        "st": {
+          "exec_ms_med": 6816.39
+        },
+        "cst": {
+          "exec_ms_med": 6281.539
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 4,
+      "result": {
+        "st": {
+          "exec_ms_med": 8496.351
+        },
+        "cst": {
+          "exec_ms_med": 40476.519
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 4,
+      "result": {
+        "st": {
+          "exec_ms_med": 6919.542
+        },
+        "cst": {
+          "exec_ms_med": 6588.329
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 4,
+      "result": {
+        "st": {
+          "exec_ms_med": 7059.025
+        },
+        "cst": {
+          "exec_ms_med": 40269.757
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 8,
+      "result": {
+        "st": {
+          "exec_ms_med": 6719.845
+        },
+        "cst": {
+          "exec_ms_med": 3268.619
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 8,
+      "result": {
+        "st": {
+          "exec_ms_med": 5354.463
+        },
+        "cst": {
+          "exec_ms_med": 18449.467
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 8,
+      "result": {
+        "st": {
+          "exec_ms_med": 5176.902
+        },
+        "cst": {
+          "exec_ms_med": 3234.281
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 8,
+      "result": {
+        "st": {
+          "exec_ms_med": 5165.132
+        },
+        "cst": {
+          "exec_ms_med": 18885.43
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 16,
+      "result": {
+        "st": {
+          "exec_ms_med": 6998.178
+        },
+        "cst": {
+          "exec_ms_med": 1814.533
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 16,
+      "result": {
+        "st": {
+          "exec_ms_med": 7859.838
+        },
+        "cst": {
+          "exec_ms_med": 9668.694
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 16,
+      "result": {
+        "st": {
+          "exec_ms_med": 6729.658
+        },
+        "cst": {
+          "exec_ms_med": 1800.473
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 16,
+      "result": {
+        "st": {
+          "exec_ms_med": 5626.128
+        },
+        "cst": {
+          "exec_ms_med": 9734.838
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 32,
+      "result": {
+        "st": {
+          "exec_ms_med": 5814.392
+        },
+        "cst": {
+          "exec_ms_med": 1046.333
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 32,
+      "result": {
+        "st": {
+          "exec_ms_med": 6854.591
+        },
+        "cst": {
+          "exec_ms_med": 6722.779
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 32,
+      "result": {
+        "st": {
+          "exec_ms_med": 5960.626
+        },
+        "cst": {
+          "exec_ms_med": 1061.576
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 32,
+      "result": {
+        "st": {
+          "exec_ms_med": 6272.399
+        },
+        "cst": {
+          "exec_ms_med": 6956.999
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 7904.41
+        },
+        "cst": {
+          "exec_ms_med": 741.157
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 7677.449
+        },
+        "cst": {
+          "exec_ms_med": 7745.795
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 6001.086
+        },
+        "cst": {
+          "exec_ms_med": 763.724
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 64,
+      "result": {
+        "st": {
+          "exec_ms_med": 6004.01
+        },
+        "cst": {
+          "exec_ms_med": 7506.505
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 120,
+      "result": {
+        "st": {
+          "exec_ms_med": 8020.488
+        },
+        "cst": {
+          "exec_ms_med": 802.108
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 120,
+      "result": {
+        "st": {
+          "exec_ms_med": 8644.905
+        },
+        "cst": {
+          "exec_ms_med": 8116.607
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 2",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 120,
+      "result": {
+        "st": {
+          "exec_ms_med": 6497.625
+        },
+        "cst": {
+          "exec_ms_med": 903.973
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 4500,
+          "CellString": 4500
+        }
+      }
+    },
+    {
+      "name": "Spatial range query (no rtree) - region 3",
+      "benchmark_type": "time",
+      "tables_used": [
+        "p10_cs.region_cs",
+        "p10_cs.stop_cs",
+        "p10_cs.trajectory_cs",
+        "p10_ls.region_poly",
+        "p10_ls.stop_poly",
+        "p10_ls.trajectory_ls",
+        "query_region"
+      ],
+      "thread_count": 120,
+      "result": {
+        "st": {
+          "exec_ms_med": 6021.148
+        },
+        "cst": {
+          "exec_ms_med": 7930.412
+        },
+        "false_positives": 0,
+        "false_negatives": 0,
+        "per_region_results": {},
+        "result_counts": {
+          "LineString": 5290,
+          "CellString": 5290
+        }
+      }
+    }
+  ]
+}
